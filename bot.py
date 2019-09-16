@@ -1,5 +1,6 @@
 import sys
 import os
+import random 
 
 import showdown 
 
@@ -24,26 +25,33 @@ class BotClient(showdown.Client):
 			server_host=server_host)
 
 	async def on_receive(self, room_id, inp_type, params):
-		"""
-		|coro|
+		if inp_type == 'poke':
+			owner = params[0]
+			pokename = params[1]
+			if owner == self.position:
+				self.team.append(pokename)
+			else:
+				self.opp_team.append(pokename)
 
-		Hook for subclasses. Called when the client receives any data from the
-		server.
-	
-		Args:
-			room_id (:obj:`str`) : ID of the room with which the information is 
-				associated with. Messages with unspecified IDs default to '
-				lobby', though may not necessarily be associated with 'lobby'.
-			inp_type (:obj:`str`) : The type of information received.
-				Ex: 'l' (user leave), 'j' (user join), 'c:' (chat message)
-			params (:obj:`list`) : List of the parameters associated with the 
-				inp_type. Ex: a user leave has params of ['zarel'], where 'zarel'
-				represents the user id of the user that left.
-
-		Notes:
-			Does nothing by default.
-		"""
-		pass
+			if (len(self.team) == self.teamsize and
+				len(self.opp_team) == self.opp_teamsize):
+				
+				#NOTE: Select starting pokemon here 
+				room_obj = self.rooms[room_id]
+				await room_obj.start_poke(random.randint(1, self.teamsize))
+		elif inp_type == 'teamsize':
+			position = params[0]
+			if position == self.position:
+				self.teamsize = int(params[1])
+				self.team = []
+			else:
+				self.opp_teamsize = int(params[1])
+				self.opp_team = []
+		elif inp_type == 'player':
+			name = params[1]
+			position = params[0] 
+			if name == self.name:
+				self.position = position
 
 	async def on_private_message(self, pm):
 		if pm.recipient == self:
@@ -56,7 +64,7 @@ class BotClient(showdown.Client):
 
 	async def on_room_init(self, room_obj):
 		if room_obj.id.startswith('battle-'):
-			await room_obj.start_poke(1)
+			pass
 
 def main():
 	if len(sys.argv) != 4:
@@ -74,4 +82,5 @@ def main():
 		expected_opponent=expected_opponent, team=team).start()
 
 if __name__ == '__main__':
+	random.seed()
 	main()
