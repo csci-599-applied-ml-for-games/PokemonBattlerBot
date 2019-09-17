@@ -2,10 +2,12 @@ import sys
 import os
 import random 
 import json 
+import csv
 
 import showdown 
 
-TEAMS_DIR = os.path.dirname(__file__)
+BOT_DIR = os.path.dirname(__file__)
+TYPE_MAP = {}
 
 class BotClient(showdown.Client):
 	def __init__(self, name='', password='', loop=None, max_room_logs=5000,
@@ -136,8 +138,20 @@ def main():
 	password = sys.argv[2]
 	expected_opponent = sys.argv[3]
 
-	with open(os.path.join(TEAMS_DIR, 'teams/PokemonTeam'), 'rt') as teamfd:
+	with open(os.path.join(BOT_DIR, 'teams/PokemonTeam'), 'rt') as teamfd:
 		team = teamfd.read()
+	
+	with open(os.path.join(BOT_DIR, 'data/PokemonTypes.csv'), 'r') as typefile:
+		reader = csv.reader(typefile, delimiter=',')		
+		for row in reader:
+			name = row[1]
+			type1 = row[2]
+			type2 = row[3]
+			TYPE_MAP[name] = []
+			if type1 != '':
+				TYPE_MAP[name].append(type1)
+			if type2 != '':
+				TYPE_MAP[name].append(type2)
 
 	BotClient(name=username, password=password, 
 		expected_opponent=expected_opponent, team=team).start()
