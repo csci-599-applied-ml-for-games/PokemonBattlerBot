@@ -99,6 +99,7 @@ class BotClient(showdown.Client):
 			elif inp_type == 'request':
 				json_string = params[0]
 				data = json.loads(json_string)
+				self.last_request_data = data
 				team_info = self.get_team_info(data)
 				for pokemon_info in team_info:
 					if pokemon_info.get('active'):
@@ -116,6 +117,9 @@ class BotClient(showdown.Client):
 					await room_obj.switch(switch_index)
 				else:
 					await self.action(room_obj, data)
+			elif inp_type == 'error':
+				if params[0].startswith('[Invalid choice]'):
+					await self.action(room_obj, self.last_request_data)
 
 	async def on_private_message(self, pm):
 		if pm.recipient == self:
