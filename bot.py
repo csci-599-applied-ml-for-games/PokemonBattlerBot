@@ -104,6 +104,7 @@ class BotClient(showdown.Client):
 					if pokemon_info.get('active'):
 						self.active_pokemon = pokemon_info['details'].rstrip(', M').rstrip(', F')
 						print('active_pokemon', self.active_pokemon)
+						print('active_pokemon types', TYPE_MAP.get(self.active_pokemon))
 						break 
 				force_switch = data.get('forceSwitch', [False])[0]
 				if force_switch == True: #TODO: can this request arrive when opponent's pokemon faints?
