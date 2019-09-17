@@ -25,6 +25,29 @@ class BotClient(showdown.Client):
 			max_room_logs=max_room_logs, server_id=server_id, 
 			server_host=server_host)
 
+	async def action(self, room_obj, data):
+		moves = data.get('active')[0].get('moves')
+		move_count = len(moves)
+		action_count = move_count
+
+		team = data.get('side').get('pokemon')
+		switch_available = []
+		for pokemon_index, pokemon_info in enumerate(team):
+			fainted = 'fnt' in pokemon_info.get('condition')
+			if (not pokemon_info.get('active', False) and 
+				not fainted):
+				
+				switch_available.append(pokemon_index + 1)
+
+		action_count += len(switch_available)
+
+		action = random.randint(1, action_count)
+		if action <= move_count:
+			await room_obj.move(action) 
+		else:
+			switch_index = switch_available[action - (move_count + 1)]
+			await room_obj.switch(switch_index)
+
 	async def on_receive(self, room_id, inp_type, params):
 		print(inp_type)
 		print(params)
@@ -80,27 +103,11 @@ class BotClient(showdown.Client):
 					switch_index = random.choice(switch_available)
 					await room_obj.switch(switch_index)
 				else:
-					moves = data.get('active')[0].get('moves')
-					move_count = len(moves)
-					action_count = move_count
+					await self.action(room_obj, data)
 
-					team = data.get('side').get('pokemon')
-					switch_available = []
-					for pokemon_index, pokemon_info in enumerate(team):
-						fainted = 'fnt' in pokemon_info.get('condition')
-						if (not pokemon_info.get('active', False) and 
-							not fainted):
-							
-							switch_available.append(pokemon_index + 1)
+			# elif inp_type == 'error':
+			# 	if '[Invalid choice]' in params[0]:
 
-					action_count += len(switch_available)
-
-					action = random.randint(1, action_count)
-					if action <= move_count:
-						await room_obj.move(action) 
-					else:
-						switch_index = switch_available[action - (move_count + 1)]
-						await room_obj.switch(switch_index)
 
 	async def on_private_message(self, pm):
 		if pm.recipient == self:
