@@ -24,15 +24,19 @@ class BotClient(showdown.Client):
 		super().__init__(name=name, password=password, loop=loop, 
 			max_room_logs=max_room_logs, server_id=server_id, 
 			server_host=server_host)
+	
+	@staticmethod
+	def get_team_info(data):
+		return data['side']['pokemon']
 
 	async def action(self, room_obj, data):
 		moves = data.get('active')[0].get('moves')
 		move_count = len(moves)
 		action_count = move_count
 
-		team = data.get('side').get('pokemon')
+		team_info = self.get_team_info(data)
 		switch_available = []
-		for pokemon_index, pokemon_info in enumerate(team):
+		for pokemon_index, pokemon_info in enumerate(team_info):
 			fainted = 'fnt' in pokemon_info.get('condition')
 			if (not pokemon_info.get('active', False) and 
 				not fainted):
@@ -93,10 +97,15 @@ class BotClient(showdown.Client):
 			elif inp_type == 'request':
 				json_string = params[0]
 				data = json.loads(json_string)
+				team_info = self.get_team_info(data)
+				for pokemon_info in team_info:
+					if pokemon_info.get('active'):
+						self.active_pokemon = pokemon_info['details'].rstrip(', M').rstrip(', F')
+						print('active_pokemon', self.active_pokemon)
+						break 
 				force_switch = data.get('forceSwitch', [False])[0]
 				if force_switch == True: #TODO: can this request arrive when opponent's pokemon faints?
 					switch_available = []
-					team_info = data['side']['pokemon']
 					for pokemon_index, pokemon_info in enumerate(team_info):
 						if 'fnt' not in pokemon_info['condition']:
 							switch_available.append(pokemon_index + 1)
@@ -116,7 +125,7 @@ class BotClient(showdown.Client):
 
 	async def on_room_init(self, room_obj):
 		if room_obj.id.startswith('battle-'):
-			pass
+			self.active_pokemon = None
 
 def main():
 	if len(sys.argv) != 4:
