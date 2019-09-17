@@ -72,7 +72,6 @@ class BotClient(showdown.Client):
 				data = json.loads(json_string)
 				force_switch = data.get('forceSwitch', [False])[0]
 				if force_switch == True: #TODO: can this request arrive when opponent's pokemon faints?
-					print("FORCE SWITCH")
 					switch_available = []
 					team_info = data['side']['pokemon']
 					for pokemon_index, pokemon_info in enumerate(team_info):
@@ -83,8 +82,25 @@ class BotClient(showdown.Client):
 				else:
 					moves = data.get('active')[0].get('moves')
 					move_count = len(moves)
-					# action_count = move_count
-					await room_obj.move(random.randint(1, move_count)) 
+					action_count = move_count
+
+					team = data.get('side').get('pokemon')
+					switch_available = []
+					for pokemon_index, pokemon_info in enumerate(team):
+						fainted = 'fnt' in pokemon_info.get('condition')
+						if (not pokemon_info.get('active', False) and 
+							not fainted):
+							
+							switch_available.append(pokemon_index + 1)
+
+					action_count += len(switch_available)
+
+					action = random.randint(1, action_count)
+					if action <= move_count:
+						await room_obj.move(action) 
+					else:
+						switch_index = switch_available[action - (move_count + 1)]
+						await room_obj.switch(switch_index)
 
 	async def on_private_message(self, pm):
 		if pm.recipient == self:
