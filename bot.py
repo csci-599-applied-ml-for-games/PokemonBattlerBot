@@ -105,10 +105,6 @@ class BotClient(showdown.Client):
 				else:
 					await self.action(room_obj, data)
 
-			# elif inp_type == 'error':
-			# 	if '[Invalid choice]' in params[0]:
-
-
 	async def on_private_message(self, pm):
 		if pm.recipient == self:
 			await pm.reply(pm.content)
