@@ -1,1 +1,4 @@
 *.pyc
+showdown/examples
+showdown/README.md
+teams
