@@ -1,4 +1,4 @@
 *.pyc
 showdown/examples
 showdown/README.md
-teams
+teams/temp_*
