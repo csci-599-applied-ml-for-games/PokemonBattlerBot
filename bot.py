@@ -247,6 +247,17 @@ class BotClient(showdown.Client):
 
 			elif inp_type == 'weather':
 				self.weather = params[0]
+				print('New weather: {}'.format(self.weather))
+
+			elif inp_type == '-sidestart':
+				position = params[0].split(':')[0]
+				if position.startswith(self.position):
+					self.sidestart.append(params[1])
+				else:
+					self.opp_sidestart.append(params[1])
+
+				print('Self sidestart', self.sidestart)
+				print('Opp sidestart', self.opp_sidestart)
 			
 			elif inp_type == 'error':
 				if params[0].startswith('[Invalid choice]'):
@@ -265,9 +276,11 @@ class BotClient(showdown.Client):
 		if room_obj.id.startswith('battle-'):
 			self.active_pokemon = None
 			self.statuses = {}
+			self.sidestart = []
 
 			self.opp_active_pokemon = None
 			self.opp_statuses = {}
+			self.opp_sidestart = []
 
 			self.weather = 'none'
 
