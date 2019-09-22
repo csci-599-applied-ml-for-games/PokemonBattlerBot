@@ -251,14 +251,31 @@ class BotClient(showdown.Client):
 
 			elif inp_type == '-sidestart':
 				position = params[0].split(':')[0]
+				hazard = params[1].lstrip('move: ')
 				if position.startswith(self.position):
-					self.sidestart.append(params[1])
+					self.sidestart.append(hazard)
 				else:
-					self.opp_sidestart.append(params[1])
+					self.opp_sidestart.append(hazard)
 
 				print('Self sidestart', self.sidestart)
 				print('Opp sidestart', self.opp_sidestart)
-			
+
+			elif inp_type == '-sideend':
+				position = params[0].split(':')[0]
+				if position.startswith(self.position):
+					try:
+						self.sidestart.remove(params[1])
+					except ValueError:
+						pass
+				else:
+					try:
+						self.opp_sidestart.remove(params[1])
+					except ValueError:
+						pass
+
+				print('Self sidestart', self.sidestart)
+				print('Opp sidestart', self.opp_sidestart)
+
 			elif inp_type == 'error':
 				if params[0].startswith('[Invalid choice]'):
 					await self.action(room_obj, self.last_request_data)
