@@ -101,12 +101,25 @@ class BotClient(showdown.Client):
 				data = json.loads(json_string)
 				self.last_request_data = data
 				team_info = self.get_team_info(data)
+				self.team_abilities = {}
+				self.team_items = {}
+				self.team_moves = {}
 				for pokemon_info in team_info:
+					print('info', pokemon_info)
+					# get the ability for each pokemon
+					self.team_abilities[str(pokemon_info['details'].rstrip(', M').rstrip(', F'))] = pokemon_info['ability']
+					# track the items each pokemon
+					self.team_items[str(pokemon_info['details'].rstrip(', M').rstrip(', F'))] = pokemon_info['item']
+					# track the team movelist?
+					self.team_moves[str(pokemon_info['details'].rstrip(', M').rstrip(', F'))] = pokemon_info['moves']
 					if pokemon_info.get('active'):
 						self.active_pokemon = pokemon_info['details'].rstrip(', M').rstrip(', F')
 						print('active_pokemon', self.active_pokemon)
 						print('active_pokemon types', TYPE_MAP.get(self.active_pokemon))
-						break 
+						#break // removed this line so it would get all the moves and stuff and things ya know
+				print('team abilities', self.team_abilities)
+				print('team items', self.team_items)
+				print('team moves', self.team_moves)	
 				force_switch = data.get('forceSwitch', [False])[0]
 				if force_switch == True: #TODO: can this request arrive when opponent's pokemon faints?
 					switch_available = []
@@ -133,6 +146,9 @@ class BotClient(showdown.Client):
 	async def on_room_init(self, room_obj):
 		if room_obj.id.startswith('battle-'):
 			self.active_pokemon = None
+
+	#async def get_active_moveset(self, params):
+		
 
 def main():
 	if len(sys.argv) != 4:
