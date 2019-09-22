@@ -54,6 +54,13 @@ class BotClient(showdown.Client):
 			switch_index = switch_available[action - (move_count + 1)]
 			await room_obj.switch(switch_index)
 
+	def own_pokemon(self, pokemon_data):
+		return pokemon_data.startswith(self.position)
+
+	@staticmethod
+	def get_pokemon(pokemon_data):
+		return pokemon_data.split(':')[1].strip()
+
 	async def on_receive(self, room_id, inp_type, params):
 		print(inp_type)
 		print(params)
@@ -130,11 +137,74 @@ class BotClient(showdown.Client):
 					await room_obj.switch(switch_index)
 				else:
 					await self.action(room_obj, data)
+			
+			elif inp_type == '-status':
+				'''
+				NOTE: statuses
+				brn
+				par
+				slp
+				frz
+				psn
+				tox
+				confusion
+				flinch
+				trapped
+				trapper
+				partiallytrapped
+				lockedmove
+				twoturnmove
+				choicelock
+				mustrecharge
+				futuremove
+				healreplacement
+				stall
+				gem
+				raindance
+				primordialsea
+				sunnyday
+				desolateland
+				sandstorm
+				hail
+				deltastream
+				arceus
+				silvally
+				'''
+				pokemon_data = params[0]
+				pokemon_name = self.get_pokemon(pokemon_data)
+				status = params[1]
+				if self.own_pokemon(pokemon_data):
+					statuses = self.statuses.get(pokemon_name, [])
+					statuses.append(status)
+					self.statuses[pokemon_name] = statuses
+				else:
+					statuses = self.opp_statuses.get(pokemon_name, [])
+					statuses.append(status)
+					self.opp_statuses[pokemon_name] = statuses
+				print('Self Status', self.statuses)
+				print('Opp Status', self.opp_statuses)
+
+			elif inp_type == '-curestatus':
+				pokemon_data = params[0]
+				pokemon_name = self.get_pokemon(pokemon_data)
+				status = params[1]
+				if self.own_pokemon(pokemon_data):
+					statuses = self.statuses.get(pokemon_name, [])
+					statuses.remove(status)
+					self.statuses[pokemon_name] = statuses
+				else:
+					statuses = self.opp_statuses.get(pokemon_name, [])
+					statuses.remove(status)
+					self.opp_statuses[pokemon_name] = statuses
+				print('Self Status', self.statuses)
+				print('Opp Status', self.opp_statuses)
+
 			elif inp_type == 'switch':
 				pokemon_data = params[0]
-				if not pokemon_data.startswith(self.position):
-					self.opp_active_pokemon = pokemon_data.split(':')[1].strip()
+				if not self.own_pokemon(pokemon_data):
+					self.opp_active_pokemon = self.get_pokemon(pokemon_data)
 					print('Opp active', self.opp_active_pokemon)
+			
 			elif inp_type == 'error':
 				if params[0].startswith('[Invalid choice]'):
 					await self.action(room_obj, self.last_request_data)
@@ -151,10 +221,10 @@ class BotClient(showdown.Client):
 	async def on_room_init(self, room_obj):
 		if room_obj.id.startswith('battle-'):
 			self.active_pokemon = None
-			self.opp_active_pokemon = None
+			self.statuses = {}
 
-	#async def get_active_moveset(self, params):
-		
+			self.opp_active_pokemon = None
+			self.opp_statuses = {}		
 
 def main():
 	if len(sys.argv) != 4:
