@@ -61,6 +61,25 @@ class BotClient(showdown.Client):
 	def get_pokemon(pokemon_data):
 		return pokemon_data.split(':')[1].strip()
 
+	def add_status(self, statuses, pokemon_name, status):
+		pokemon_statuses = statuses.get(pokemon_name, [])
+		pokemon_statuses.append(status)
+		statuses[pokemon_name] = pokemon_statuses
+		
+		print('Self Status', self.statuses)
+		print('Opp Status', self.opp_statuses)
+
+	def remove_status(self, statuses, pokemon_name, status):
+		pokemon_statuses = statuses.get(pokemon_name, [])
+		try:
+			pokemon_statuses.remove(status)
+		except ValueError:
+			pass
+		statuses[pokemon_name] = pokemon_statuses
+
+		print('Self Status', self.statuses)
+		print('Opp Status', self.opp_statuses)
+
 	async def on_receive(self, room_id, inp_type, params):
 		print(inp_type)
 		print(params)
@@ -119,10 +138,10 @@ class BotClient(showdown.Client):
 					self.team_items[str(pokemon_info['details'].rstrip(', M').rstrip(', F'))] = pokemon_info['item']
 					# track the team movelist?
 					self.team_moves[str(pokemon_info['details'].rstrip(', M').rstrip(', F'))] = pokemon_info['moves']
-					if pokemon_info.get('active'):
-						self.active_pokemon = pokemon_info['details'].rstrip(', M').rstrip(', F')
-						print('active_pokemon', self.active_pokemon)
-						print('active_pokemon types', TYPE_MAP.get(self.active_pokemon))
+					# if pokemon_info.get('active'):
+						# self.active_pokemon = pokemon_info['details'].rstrip(', M').rstrip(', F')
+						# print('active_pokemon', self.active_pokemon)
+						# print('active_pokemon types', TYPE_MAP.get(self.active_pokemon))
 						#break // removed this line so it would get all the moves and stuff and things ya know
 				print('team abilities', self.team_abilities)
 				print('team items', self.team_items)
@@ -174,36 +193,57 @@ class BotClient(showdown.Client):
 				pokemon_name = self.get_pokemon(pokemon_data)
 				status = params[1]
 				if self.own_pokemon(pokemon_data):
-					statuses = self.statuses.get(pokemon_name, [])
-					statuses.append(status)
-					self.statuses[pokemon_name] = statuses
+					self.add_status(self.statuses, pokemon_name, status)
 				else:
-					statuses = self.opp_statuses.get(pokemon_name, [])
-					statuses.append(status)
-					self.opp_statuses[pokemon_name] = statuses
-				print('Self Status', self.statuses)
-				print('Opp Status', self.opp_statuses)
+					self.add_status(self.opp_statuses, pokemon_name, status)
+
+			elif inp_type == '-start':
+				pokemon_data = params[0]
+				pokemon_name = self.get_pokemon(pokemon_data)
+				status = params[1]
+				if self.own_pokemon(pokemon_data):
+					self.add_status(self.statuses, pokemon_name, status)
+				else:
+					self.add_status(self.opp_statuses, pokemon_name, status)
+
+			elif inp_type == '-end':
+				pokemon_data = params[0]
+				pokemon_name = self.get_pokemon(pokemon_data)
+				status = params[1]
+				if self.own_pokemon(pokemon_data):
+					self.remove_status(self.statuses, pokemon_name, status)
+				else:
+					self.remove_status(self.opp_statuses, pokemon_name, status)
 
 			elif inp_type == '-curestatus':
 				pokemon_data = params[0]
 				pokemon_name = self.get_pokemon(pokemon_data)
 				status = params[1]
 				if self.own_pokemon(pokemon_data):
-					statuses = self.statuses.get(pokemon_name, [])
-					statuses.remove(status)
-					self.statuses[pokemon_name] = statuses
+					self.remove_status(self.statuses, pokemon_name, status)
 				else:
-					statuses = self.opp_statuses.get(pokemon_name, [])
-					statuses.remove(status)
-					self.opp_statuses[pokemon_name] = statuses
-				print('Self Status', self.statuses)
-				print('Opp Status', self.opp_statuses)
+					self.remove_status(self.opp_statuses, pokemon_name, status)
 
 			elif inp_type == 'switch':
 				pokemon_data = params[0]
+
+				volatile_statuses = ['confusion', 'curse']
+				if self.own_pokemon(pokemon_data):
+					pokemon_name = self.active_pokemon
+					statuses = self.statuses
+				else:
+					pokemon_name = self.opp_active_pokemon
+					statuses = self.opp_statuses
+				for volatile_status in volatile_statuses:
+					self.remove_status(statuses, pokemon_name, volatile_status)
+
 				if not self.own_pokemon(pokemon_data):
 					self.opp_active_pokemon = self.get_pokemon(pokemon_data)
 					print('Opp active', self.opp_active_pokemon)
+				else:
+					self.active_pokemon = self.get_pokemon(pokemon_data)
+					print('active_pokemon', self.active_pokemon)
+					print('active_pokemon types', TYPE_MAP.get(self.active_pokemon))
 			
 			elif inp_type == 'error':
 				if params[0].startswith('[Invalid choice]'):
