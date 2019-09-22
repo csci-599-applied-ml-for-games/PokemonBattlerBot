@@ -244,6 +244,9 @@ class BotClient(showdown.Client):
 					self.active_pokemon = self.get_pokemon(pokemon_data)
 					print('active_pokemon', self.active_pokemon)
 					print('active_pokemon types', TYPE_MAP.get(self.active_pokemon))
+
+			elif inp_type == 'weather':
+				self.weather = params[0]
 			
 			elif inp_type == 'error':
 				if params[0].startswith('[Invalid choice]'):
@@ -264,7 +267,9 @@ class BotClient(showdown.Client):
 			self.statuses = {}
 
 			self.opp_active_pokemon = None
-			self.opp_statuses = {}		
+			self.opp_statuses = {}
+
+			self.weather = 'none'
 
 def main():
 	if len(sys.argv) != 4:
