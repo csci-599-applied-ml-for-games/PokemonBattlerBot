@@ -130,6 +130,11 @@ class BotClient(showdown.Client):
 					await room_obj.switch(switch_index)
 				else:
 					await self.action(room_obj, data)
+			elif inp_type == 'switch':
+				pokemon_data = params[0]
+				if not pokemon_data.startswith(self.position):
+					self.opp_active_pokemon = pokemon_data.split(':')[1].strip()
+					print('Opp active', self.opp_active_pokemon)
 			elif inp_type == 'error':
 				if params[0].startswith('[Invalid choice]'):
 					await self.action(room_obj, self.last_request_data)
@@ -146,6 +151,7 @@ class BotClient(showdown.Client):
 	async def on_room_init(self, room_obj):
 		if room_obj.id.startswith('battle-'):
 			self.active_pokemon = None
+			self.opp_active_pokemon = None
 
 	#async def get_active_moveset(self, params):
 		
