@@ -361,13 +361,13 @@ class BotClient(showdown.Client):
 
 			self.weather = 'none'
 
-# This is a template.  Feel free to Delet.
+# JK this is not a template don't delete.
 class EnemyState():
 	# class to track the enemy state
 	# 
 	def __init__(self, opposing_team):
 		self.active_pokemon = None
-		self.team_map_status = {}
+		self.team_status = {}
 		self.team_type_map = {}
 		self.team_abilities = {} # this will have to be tracked through damage
 		self.team_moves = {}
