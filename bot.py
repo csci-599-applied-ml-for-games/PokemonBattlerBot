@@ -22,7 +22,7 @@ class BotClient(showdown.Client):
 		if team == None:
 			raise Exception("No team found in arguments")
 		else:
-			self.team = team
+			self.team_text = team
 
 		self.challenge = challenge
 		self.has_challenged = False
@@ -101,7 +101,7 @@ class BotClient(showdown.Client):
 			#NOTE: Sorry for this hack...wasn't sure how best to approach this
 			self.has_challenged = True
 			await self.cancel_challenge()
-			await self.send_challenge(self.expected_opponent, self.team, 
+			await self.send_challenge(self.expected_opponent, self.team_text, 
 				'gen7ou')
 
 		print(inp_type)
@@ -326,12 +326,11 @@ class BotClient(showdown.Client):
 					print("Starting iteration {}".format(self.iterations_run))
 					if self.challenge:
 						print("Challenging {}".format(self.expected_opponent))
-						time.sleep(10)
+						time.sleep(5)
 						await self.cancel_challenge()
-						print("Cancel challenge")
+						time.sleep(1)
 						await self.send_challenge(self.expected_opponent, 
-							self.team, 'gen7ou')
-						print("Send challenge")
+							self.team_text, 'gen7ou')
 				else:
 					sys.exit(0)
 
