@@ -383,12 +383,12 @@ class EnemyState():
 	def __parse_pokemon_names(self, team):
 		for pokemon in team:
 			pokemon_name = str(pokemon.rstrip(', M').rstrip(', F'))
-			self.team_map_status[pokemon_name] = None
+			self.team_status[pokemon_name] = None
 	# end __parse_pokemon_names
 
 	# create empty movelist array for each pokemon
 	def __create_movelist__(self):
-		for pokemon in self.team_map_status:
+		for pokemon in self.team_status:
 			self.team_moves[pokemon] = []
 	# end __create__movelist			
 
