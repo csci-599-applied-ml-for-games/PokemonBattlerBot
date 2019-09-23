@@ -12,7 +12,7 @@ TYPE_MAP = {}
 class BotClient(showdown.Client):
 	def __init__(self, name='', password='', loop=None, max_room_logs=5000,
 		server_id='showdown', server_host=None, expected_opponent=None,
-		team=None):
+		team=None, challenge=False):
 
 		if expected_opponent == None:
 			raise Exception("No expected opponent found in arguments")
@@ -22,6 +22,9 @@ class BotClient(showdown.Client):
 			raise Exception("No team found in arguments")
 		else:
 			self.team = team
+
+		self.challenge = challenge
+		self.has_challenged = False
 
 		super().__init__(name=name, password=password, loop=loop, 
 			max_room_logs=max_room_logs, server_id=server_id, 
@@ -81,6 +84,13 @@ class BotClient(showdown.Client):
 		print('Opp Status', self.opp_statuses)
 
 	async def on_receive(self, room_id, inp_type, params):
+		if self.challenge and not self.has_challenged:
+			#NOTE: Sorry for this hack...wasn't sure how best to approach this
+			self.has_challenged = True
+			await self.cancel_challenge()
+			await self.send_challenge(self.expected_opponent, self.team, 
+				'gen7ou')
+
 		print(inp_type)
 		print(params)
 
@@ -280,9 +290,13 @@ class BotClient(showdown.Client):
 				if params[0].startswith('[Invalid choice]'):
 					await self.action(room_obj, self.last_request_data)
 
-	async def on_private_message(self, pm):
-		if pm.recipient == self:
-			await pm.reply(pm.content)
+			elif inp_type == 'win':
+				winner = params[0]
+				if winner == self.name:
+					print("We won")
+				else:
+					print("We lost")
+				sys.exit(0)
 
 	async def on_challenge_update(self, challenge_data):
 		incoming = challenge_data.get('challengesFrom', {})
@@ -302,13 +316,15 @@ class BotClient(showdown.Client):
 			self.weather = 'none'
 
 def main():
-	if len(sys.argv) != 4:
-		print('Usage: python bot.py <username> <password> <expected_opponent>')
+	if len(sys.argv) != 4 and len(sys.argv) != 5:
+		print('Usage: python bot.py <username> <password> <expected_opponent> '
+			'[--challenge]')
 		return 
 
 	username = sys.argv[1]
 	password = sys.argv[2]
 	expected_opponent = sys.argv[3]
+	challenge = len(sys.argv) == 5
 
 	with open(os.path.join(BOT_DIR, 'teams/PokemonTeam'), 'rt') as teamfd:
 		team = teamfd.read()
@@ -326,7 +342,8 @@ def main():
 				TYPE_MAP[name].append(type2)
 
 	BotClient(name=username, password=password, 
-		expected_opponent=expected_opponent, team=team).start()
+		expected_opponent=expected_opponent, team=team, 
+		challenge=challenge).start()
 
 if __name__ == '__main__':
 	random.seed()
