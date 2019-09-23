@@ -3,6 +3,7 @@ import os
 import random 
 import json 
 import csv
+import time
 
 import showdown 
 
@@ -12,7 +13,7 @@ TYPE_MAP = {}
 class BotClient(showdown.Client):
 	def __init__(self, name='', password='', loop=None, max_room_logs=5000,
 		server_id='showdown', server_host=None, expected_opponent=None,
-		team=None):
+		team=None, challenge=False, iterations=1):
 
 		if expected_opponent == None:
 			raise Exception("No expected opponent found in arguments")
@@ -23,6 +24,12 @@ class BotClient(showdown.Client):
 		else:
 			self.team = team
 
+		self.challenge = challenge
+		self.has_challenged = False
+
+		self.iterations_run = 0
+		self.iterations = iterations 
+
 		super().__init__(name=name, password=password, loop=loop, 
 			max_room_logs=max_room_logs, server_id=server_id, 
 			server_host=server_host)
@@ -30,6 +37,15 @@ class BotClient(showdown.Client):
 	@staticmethod
 	def get_team_info(data):
 		return data['side']['pokemon']
+
+	async def switch_pokemon(self, room_obj, data):
+		team_info = self.get_team_info(data)
+		switch_available = []
+		for pokemon_index, pokemon_info in enumerate(team_info):
+			if 'fnt' not in pokemon_info['condition']:
+				switch_available.append(pokemon_index + 1)
+		switch_index = random.choice(switch_available)
+		await room_obj.switch(switch_index)
 
 	async def action(self, room_obj, data):
 		moves = data.get('active')[0].get('moves')
@@ -81,6 +97,13 @@ class BotClient(showdown.Client):
 		print('Opp Status', self.opp_statuses)
 
 	async def on_receive(self, room_id, inp_type, params):
+		if self.challenge and not self.has_challenged:
+			#NOTE: Sorry for this hack...wasn't sure how best to approach this
+			self.has_challenged = True
+			await self.cancel_challenge()
+			await self.send_challenge(self.expected_opponent, self.team, 
+				'gen7ou')
+
 		print(inp_type)
 		print(params)
 
@@ -150,13 +173,15 @@ class BotClient(showdown.Client):
 				print('team items', self.team_items)
 				print('team moves', self.team_moves)	
 				force_switch = data.get('forceSwitch', [False])[0]
-				if force_switch == True: #TODO: can this request arrive when opponent's pokemon faints?
-					switch_available = []
-					for pokemon_index, pokemon_info in enumerate(team_info):
-						if 'fnt' not in pokemon_info['condition']:
-							switch_available.append(pokemon_index + 1)
-					switch_index = random.choice(switch_available)
-					await room_obj.switch(switch_index)
+				if force_switch == True:
+					# switch_available = []
+					# for pokemon_index, pokemon_info in enumerate(team_info):
+					# 	if 'fnt' not in pokemon_info['condition']:
+					# 		switch_available.append(pokemon_index + 1)
+					# switch_index = random.choice(switch_available)
+					# await room_obj.switch(switch_index)
+
+					await self.switch_pokemon(room_obj, data)
 				else:
 					await self.action(room_obj, data)
 			
@@ -281,7 +306,34 @@ class BotClient(showdown.Client):
 
 			elif inp_type == 'error':
 				if params[0].startswith('[Invalid choice]'):
-					await self.action(room_obj, self.last_request_data)
+					if ("Can't switch: You can't switch to an active Pokémon" 
+						in params[0]):
+						await self.switch_pokemon(room_obj, 
+							self.last_request_data)
+					else:
+						await self.action(room_obj, self.last_request_data)
+
+			elif inp_type == 'win':
+				winner = params[0]
+				if winner == self.name:
+					print("We won")
+				else:
+					print("We lost")
+				await room_obj.leave()
+				self.iterations_run += 1
+				
+				if self.iterations_run < self.iterations:
+					print("Starting iteration {}".format(self.iterations_run))
+					if self.challenge:
+						print("Challenging {}".format(self.expected_opponent))
+						time.sleep(10)
+						await self.cancel_challenge()
+						print("Cancel challenge")
+						await self.send_challenge(self.expected_opponent, 
+							self.team, 'gen7ou')
+						print("Send challenge")
+				else:
+					sys.exit(0)
 
 			elif inp_type == '-ability':
 				# might work to track some abilities but so far weather abilities and other abilities
@@ -428,13 +480,16 @@ class Pokemon():
 
 
 def main():
-	if len(sys.argv) != 4:
-		print('Usage: python bot.py <username> <password> <expected_opponent>')
+	if len(sys.argv) != 5 and len(sys.argv) != 6:
+		print('Usage: python bot.py <iterations> <username> <password> <expected_opponent> '
+			'[--challenge]')
 		return 
 
-	username = sys.argv[1]
-	password = sys.argv[2]
-	expected_opponent = sys.argv[3]
+	iterations = int(sys.argv[1])
+	username = sys.argv[2]
+	password = sys.argv[3]
+	expected_opponent = sys.argv[4]
+	challenge = len(sys.argv) == 6
 
 	with open(os.path.join(BOT_DIR, 'teams/PokemonTeam'), 'rt') as teamfd:
 		team = teamfd.read()
@@ -452,7 +507,8 @@ def main():
 				TYPE_MAP[name].append(type2)
 
 	BotClient(name=username, password=password, 
-		expected_opponent=expected_opponent, team=team).start()
+		expected_opponent=expected_opponent, team=team, 
+		challenge=challenge, iterations=iterations).start()
 
 if __name__ == '__main__':
 	random.seed()
