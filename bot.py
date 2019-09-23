@@ -398,7 +398,7 @@ class BotClient(showdown.Client):
 	async def on_challenge_update(self, challenge_data):
 		incoming = challenge_data.get('challengesFrom', {})
 		if self.expected_opponent.lower() in incoming:
-			await self.accept_challenge(self.expected_opponent, self.team)
+			await self.accept_challenge(self.expected_opponent, self.team_text)
 
 	async def on_room_init(self, room_obj):
 		if room_obj.id.startswith('battle-'):
