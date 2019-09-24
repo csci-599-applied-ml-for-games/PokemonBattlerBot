@@ -445,7 +445,7 @@ class EnemyState():
 		# add future states
 
 		self.__parse_pokemon_names(opposing_team)
-		self.__create_movelist__()
+		self.__create_movelist()
 	# end __init__
 
 	def __parse_pokemon_names(self, team):
@@ -455,7 +455,7 @@ class EnemyState():
 	# end __parse_pokemon_names
 
 	# create empty movelist array for each pokemon
-	def __create_movelist__(self):
+	def __create_movelist(self):
 		for pokemon in self.team_status:
 			self.team_moves[pokemon] = []
 	# end __create__movelist			
