@@ -402,6 +402,7 @@ class BotClient(showdown.Client):
 
 	async def on_room_init(self, room_obj):
 		if room_obj.id.startswith('battle-'):
+			print(f'Room ID: {room_obj.id}')
 			self.active_pokemon = None
 			self.statuses = {}
 			self.sidestart = []
