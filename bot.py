@@ -4,6 +4,7 @@ import random
 import json 
 import csv
 import time
+from datetime import datetime
 
 import showdown 
 
@@ -30,9 +31,21 @@ class BotClient(showdown.Client):
 		self.iterations_run = 0
 		self.iterations = iterations 
 
+		self.datestring = datetime.now().strftime('%y-%m-%d-%H-%M-%S')
+
 		super().__init__(name=name, password=password, loop=loop, 
 			max_room_logs=max_room_logs, server_id=server_id, 
 			server_host=server_host)
+
+	def log(self, *args):
+		l = [str(arg) for arg in args]
+		string = ' '.join(l)
+		logs_dir = os.path.join(os.path.dirname(__file__), 'logs')
+		if not os.path.exists(logs_dir):
+			os.mkdir(logs_dir)
+		log_file = f'{self.datestring}_Iteration{self.iterations_run}.txt'
+		with open(os.path.join(logs_dir, log_file), 'a') as fd:
+			fd.write(f'{string}\n')
 	
 	@staticmethod
 	def get_team_info(data):
@@ -82,8 +95,8 @@ class BotClient(showdown.Client):
 		pokemon_statuses.append(status)
 		statuses[pokemon_name] = pokemon_statuses
 		
-		print('Self Status', self.statuses)
-		print('Opp Status', self.opp_statuses)
+		self.log('Self Status', self.statuses)
+		self.log('Opp Status', self.opp_statuses)
 
 	def remove_status(self, statuses, pokemon_name, status):
 		pokemon_statuses = statuses.get(pokemon_name, [])
@@ -93,22 +106,22 @@ class BotClient(showdown.Client):
 			pass
 		statuses[pokemon_name] = pokemon_statuses
 
-		print('Self Status', self.statuses)
-		print('Opp Status', self.opp_statuses)
+		self.log('Self Status', self.statuses)
+		self.log('Opp Status', self.opp_statuses)
+
+	async def challenge_expected(self):
+		self.log("Challenging {}".format(self.expected_opponent))
+		await self.cancel_challenge()
+		time.sleep(1)
+		await self.send_challenge(self.expected_opponent, self.team_text, 
+			'gen7ou')
 
 	async def on_receive(self, room_id, inp_type, params):
-		if self.challenge and not self.has_challenged:
-			#NOTE: Sorry for this hack...wasn't sure how best to approach this
-			self.has_challenged = True
-			await self.cancel_challenge()
-			await self.send_challenge(self.expected_opponent, self.team_text, 
-				'gen7ou')
+		self.log(f'Input type: {inp_type}')
+		self.log(f'Params: {params}')
 
-		print(inp_type)
-		print(params)
-
-		room_obj = self.rooms[room_id]	
-		if room_obj.id.startswith('battle-'):
+		room_obj = self.rooms.get(room_id)
+		if room_obj and room_obj.id.startswith('battle-'):
 			if inp_type == 'poke':
 				owner = params[0]
 				pokename = params[1]
@@ -120,8 +133,8 @@ class BotClient(showdown.Client):
 				if (len(self.team) == self.teamsize and
 					len(self.opp_team) == self.opp_teamsize):
 
-					print(f'Team: {self.team}')
-					print(f'Opp team: {self.opp_team}')
+					self.log(f'Team: {self.team}')
+					self.log(f'Opp team: {self.opp_team}')
 					
 					# create the enemy state tracker... this should only be created once if I put this here yea?
 					self.enemy_state = EnemyState(self.opp_team)
@@ -157,7 +170,7 @@ class BotClient(showdown.Client):
 				self.team_items = {}
 				self.team_moves = {}
 				for pokemon_info in team_info:
-					print('info', pokemon_info)
+					self.log('info', pokemon_info)
 					# get the ability for each pokemon
 					self.team_abilities[str(pokemon_info['details'].rstrip(', M').rstrip(', F'))] = pokemon_info['ability']
 					# track the items each pokemon
@@ -166,12 +179,12 @@ class BotClient(showdown.Client):
 					self.team_moves[str(pokemon_info['details'].rstrip(', M').rstrip(', F'))] = pokemon_info['moves']
 					# if pokemon_info.get('active'):
 						# self.active_pokemon = pokemon_info['details'].rstrip(', M').rstrip(', F')
-						# print('active_pokemon', self.active_pokemon)
-						# print('active_pokemon types', TYPE_MAP.get(self.active_pokemon))
+						# self.log('active_pokemon', self.active_pokemon)
+						# self.log('active_pokemon types', TYPE_MAP.get(self.active_pokemon))
 						#break // removed this line so it would get all the moves and stuff and things ya know
-				print('team abilities', self.team_abilities)
-				print('team items', self.team_items)
-				print('team moves', self.team_moves)	
+				self.log('team abilities', self.team_abilities)
+				self.log('team items', self.team_items)
+				self.log('team moves', self.team_moves)	
 				force_switch = data.get('forceSwitch', [False])[0]
 				if force_switch == True:
 					# switch_available = []
@@ -267,15 +280,15 @@ class BotClient(showdown.Client):
 
 				if not self.own_pokemon(pokemon_data):
 					self.opp_active_pokemon = self.get_pokemon(pokemon_data)
-					print('Opp active', self.opp_active_pokemon)
+					self.log('Opp active', self.opp_active_pokemon)
 				else:
 					self.active_pokemon = self.get_pokemon(pokemon_data)
-					print('active_pokemon', self.active_pokemon)
-					print('active_pokemon types', TYPE_MAP.get(self.active_pokemon))
+					self.log('active_pokemon', self.active_pokemon)
+					self.log('active_pokemon types', TYPE_MAP.get(self.active_pokemon))
 
 			elif inp_type == 'weather':
 				self.weather = params[0]
-				print('New weather: {}'.format(self.weather))
+				self.log('New weather: {}'.format(self.weather))
 
 			elif inp_type == '-sidestart':
 				position = params[0].split(':')[0]
@@ -285,8 +298,8 @@ class BotClient(showdown.Client):
 				else:
 					self.opp_sidestart.append(hazard)
 
-				print('Self sidestart', self.sidestart)
-				print('Opp sidestart', self.opp_sidestart)
+				self.log('Self sidestart', self.sidestart)
+				self.log('Opp sidestart', self.opp_sidestart)
 
 			elif inp_type == '-sideend':
 				position = params[0].split(':')[0]
@@ -301,8 +314,8 @@ class BotClient(showdown.Client):
 					except ValueError:
 						pass
 
-				print('Self sidestart', self.sidestart)
-				print('Opp sidestart', self.opp_sidestart)
+				self.log('Self sidestart', self.sidestart)
+				self.log('Opp sidestart', self.opp_sidestart)
 
 			elif inp_type == 'error':
 				if params[0].startswith('[Invalid choice]'):
@@ -316,29 +329,25 @@ class BotClient(showdown.Client):
 			elif inp_type == 'win':
 				winner = params[0]
 				if winner == self.name:
-					print("We won")
+					self.log("We won")
 				else:
-					print("We lost")
+					self.log("We lost")
 				await room_obj.leave()
 				self.iterations_run += 1
 				
 				if self.iterations_run < self.iterations:
-					print("Starting iteration {}".format(self.iterations_run))
+					self.log("Starting iteration {}".format(self.iterations_run))
 					if self.challenge:
-						print("Challenging {}".format(self.expected_opponent))
 						time.sleep(5)
-						await self.cancel_challenge()
-						time.sleep(1)
-						await self.send_challenge(self.expected_opponent, 
-							self.team_text, 'gen7ou')
+						await self.challenge_expected()
 				else:
 					sys.exit(0)
 
 			elif inp_type == '-ability':
 				# might work to track some abilities but so far weather abilities and other abilities
 				# are only made known when a specific game action is made.
-				print('ability')
-				#print(params)
+				self.log('ability')
+				#self.log(params)
 			
 			elif inp_type == '-damage':
 				# this section to track the enemy abilities
@@ -346,7 +355,7 @@ class BotClient(showdown.Client):
 					pokemon = params[3].strip('[of] p1a: ')
 					ability = params[2].strip('[from] ability: ')
 					self.enemy_state.update_abilities(pokemon, ability)
-					print('Pokemon: ', pokemon, 'Enemy Ability: ', self.enemy_state.team_abilities[pokemon])
+					self.log('Pokemon: ', pokemon, 'Enemy Ability: ', self.enemy_state.team_abilities[pokemon])
 			
 			elif inp_type == '-mega':
 				if ('p1a' in str(params[0])):
@@ -355,27 +364,27 @@ class BotClient(showdown.Client):
 					pokemon = params[0].strip('p1a: ') # just easier to read this way
 					self.enemy_state.update_team_mega(pokemon)
 					self.opp_mega = True
-					print('Enemy Mega Active: ', self.enemy_state.team_mega[pokemon])
+					self.log('Enemy Mega Active: ', self.enemy_state.team_mega[pokemon])
 				else:
 					# AI uses mega
 					self.mega = True
 
 			elif inp_type == '-item':
 				# how do we use items I don't get it...
-				print('item')
-				#print(params)
+				self.log('item')
+				#self.log(params)
 
 			elif inp_type == 'move':
 				if ('p1a' in str(params[0])):
 					# player 1 active pokemon used move.
 					pokemon = params[0].strip('p1a: ')
 					self.enemy_state.update_moves_list(pokemon, params[1])
-					print('P1 used: ', params[1])
-					print('Enemy Moves State:', self.enemy_state.team_moves)
+					self.log('P1 used: ', params[1])
+					self.log('Enemy Moves State:', self.enemy_state.team_moves)
 				else:
 					# player 2 pokemon used move.
 					my_move = params[1]
-					print('P2 used: ', my_move)
+					self.log('P2 used: ', my_move)
 
 			elif inp_type == '-zpower':
 				if ('p1a' in str(params[0])):
@@ -389,7 +398,14 @@ class BotClient(showdown.Client):
 					self.z_power = True
 
 			elif inp_type == '-weather':
-				print('weather', params)
+				self.log('weather', params)
+		else:
+			if inp_type == 'updateuser':
+				if (self.name == params[0].strip() and self.challenge and 
+					not self.has_challenged):
+					self.has_challenged = True
+					time.sleep(1)
+					await self.challenge_expected()
 
 	async def on_private_message(self, pm):
 		if pm.recipient == self:
@@ -402,7 +418,7 @@ class BotClient(showdown.Client):
 
 	async def on_room_init(self, room_obj):
 		if room_obj.id.startswith('battle-'):
-			print(f'Room ID: {room_obj.id}')
+			self.log(f'Room ID: {room_obj.id}')
 			self.active_pokemon = None
 			self.statuses = {}
 			self.sidestart = []
