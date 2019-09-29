@@ -166,11 +166,14 @@ class BotClient(showdown.Client):
 				data = json.loads(json_string)
 				self.last_request_data = data
 				team_info = self.get_team_info(data)
+				self.team_health = {}
 				self.team_abilities = {}
 				self.team_items = {}
 				self.team_moves = {}
 				for pokemon_info in team_info:
 					self.log('info', pokemon_info)
+					# get health for each pokemon
+					self.team_health[str(pokemon_info['details'].rstrip(', M').rstrip(', F'))] = pokemon_info['condition']
 					# get the ability for each pokemon
 					self.team_abilities[str(pokemon_info['details'].rstrip(', M').rstrip(', F'))] = pokemon_info['ability']
 					# track the items each pokemon
@@ -182,6 +185,7 @@ class BotClient(showdown.Client):
 						# self.log('active_pokemon', self.active_pokemon)
 						# self.log('active_pokemon types', TYPE_MAP.get(self.active_pokemon))
 						#break // removed this line so it would get all the moves and stuff and things ya know
+				self.log('team health', self.team_health)
 				self.log('team abilities', self.team_abilities)
 				self.log('team items', self.team_items)
 				self.log('team moves', self.team_moves)	
