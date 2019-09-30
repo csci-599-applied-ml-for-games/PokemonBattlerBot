@@ -1,0 +1,10 @@
+Starting iteration 1
+Challenging 456robert
+Input type: updatesearch
+Params: ['{"searching":[],"games":null}']
+Input type: deinit
+Params: []
+Input type: updatechallenges
+Params: ['{"challengesFrom":{},"challengeTo":{"to":"456robert","format":"gen7ou"}}']
+Input type: updatesearch
+Params: ['{"searching":[],"games":null}']
