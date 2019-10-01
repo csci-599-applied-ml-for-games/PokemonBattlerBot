@@ -1,13 +1,14 @@
 '''
- This holds various classes to help organize the data
+This class holds the game state
 '''
 
 import pokemoninfo
 
 class PlayerState():
+
 	def __init__(self, team):
 		self.active_pokemon = None
-        self.team = {}
+		self.team = {}
 		self.team_status = {}
 		self.team_type_map = {}
 		self.team_abilities = {} # this will have to be tracked through damage
@@ -19,8 +20,8 @@ class PlayerState():
 	def __parse_pokemon_names(self, team):
 		for pokemon in team:
 			pokemon_name = str(pokemon.rstrip(', M').rstrip(', F'))
-            pokemon_obj = pokemoninfo.Pokemon(pokemon_name)
-            self.team[pokemon_name] = pokemon_obj
+			pokemon_obj = pokemoninfo.Pokemon(pokemon_name)
+			self.team[pokemon_name] = pokemon_obj
 			self.team_status[pokemon_name] = None
 	# end __parse_pokemon_names
 
