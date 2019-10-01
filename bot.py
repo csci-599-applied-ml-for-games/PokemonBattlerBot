@@ -185,13 +185,12 @@ class BotClient(showdown.Client):
 				self.last_request_data = data
 				team_info = self.get_team_info(data)
 				active_info = self.get_active_info(data)
-				self.log('active info:', active_info)
-				print(len(active_info))
+				self.log('active info:', active_info[0])
 				self.team_health = {}
 				self.team_abilities = {}
 				self.team_items = {}
 				self.team_moves = {}
-
+				
 				for pokemon_info in team_info:
 					self.log('info', pokemon_info)
 					# get health for each pokemon
@@ -203,17 +202,35 @@ class BotClient(showdown.Client):
 					# track the team movelist?
 					self.team_moves[str(pokemon_info['details'].rstrip(', M').rstrip(', F'))] = pokemon_info['moves']
 					
-					#if pokemon_info.get('active'):
-						#self.active_pokemon = pokemon_info['details'].rstrip(', M').rstrip(', F')
+					if pokemon_info.get('active'):
+						self.active_pokemon = pokemon_info['details'].rstrip(', M').rstrip(', F')
 						# self.log('active_pokemon', self.active_pokemon)
 						# self.log('active_pokemon types', TYPE_MAP.get(self.active_pokemon))
 						#break // removed this line so it would get all the moves and stuff and things ya know
 
-				# check if we can z power
-				#if len(active_info) > 1:
-					# then we have a 'CanZMove'?
-					#self.z_power_name = active_info['canZMove']['move']
-					#self.log('Z Power Name:', self.z_power_name)
+				#check if we can z power
+				for info in active_info[0]:
+					if info == 'canZMove':
+						self.z_power_json= active_info[0]['canZMove']
+						self.log('Zpower json', self.z_power_json)
+						z_list = active_info[0]['canZMove']
+						print(z_list)
+						try:
+							self.z_power_name = active_info[0]['canZMove'][1]['move']
+							self.z_power_name = self.z_power_name.strip(' ').lower()
+							self.log('Z Power Name:', self.z_power_name)
+						except:
+							self.log('Z Power Parse Error')
+						# Theres a Z Power we don't know which spot this is going to be in
+						# Wont iterate for some reason??? crashes
+						#for z_move in active_info[0]['canZMove']
+							#if z_move != None:
+								#z_power_move = z_move['move']
+								#self.z_power_name = z_power_move.strip(' ').lower()
+								#self.log('Z Power Move:', self.z_power_name)
+					elif info == 'canMegaEvo':
+						self.can_mega = active_info[0]['canMegaEvo']
+						self.log('Active Can Mega: ', active_info[0]['canMegaEvo'])
 
 				# get the status of my moves
 				#for move in active_info['moves']:
