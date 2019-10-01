@@ -185,6 +185,8 @@ class BotClient(showdown.Client):
 				self.last_request_data = data
 				team_info = self.get_team_info(data)
 				active_info = self.get_active_info(data)
+				self.log('active info:', active_info)
+				print(len(active_info))
 				self.team_health = {}
 				self.team_abilities = {}
 				self.team_items = {}
@@ -201,31 +203,33 @@ class BotClient(showdown.Client):
 					# track the team movelist?
 					self.team_moves[str(pokemon_info['details'].rstrip(', M').rstrip(', F'))] = pokemon_info['moves']
 					
-					if pokemon_info.get('active'):
-						self.active_pokemon = pokemon_info['details'].rstrip(', M').rstrip(', F')
+					#if pokemon_info.get('active'):
+						#self.active_pokemon = pokemon_info['details'].rstrip(', M').rstrip(', F')
 						# self.log('active_pokemon', self.active_pokemon)
 						# self.log('active_pokemon types', TYPE_MAP.get(self.active_pokemon))
 						#break // removed this line so it would get all the moves and stuff and things ya know
 
 				# check if we can z power
-				if len(active_info) > 1:
+				#if len(active_info) > 1:
 					# then we have a 'CanZMove'?
-					self.z_power_name = active_info['canZMove']['move']
-					self.log('Z Power Name:', self.z_power_name)
+					#self.z_power_name = active_info['canZMove']['move']
+					#self.log('Z Power Name:', self.z_power_name)
 
 				# get the status of my moves
-				for move in active_info['moves']:
-					self.log('active info', active_info)
+				#for move in active_info['moves']:
+					#self.log('active info', active_info)
 					# returns a lot of data.
 					# stores in dict (probably won't work tbh)
-					if move['id'] not in self.my_state.team_moves[self.active_pokemon]:
-						self.my_state.team_moves[self.active_pokemon].append(move)
+					#if move['id'] in self.my_state.team_moves[self.active_pokemon]['id']:
+						#self.my_state.team_moves[self.active_pokemon] = move
+					#else:
+						#self.my_state.team_moves[self.active_pokemon].append(move)
 					# stores in object
-					self.my_state.team[self.active_pokemon].update_move(move)
-					self.log('move status: ', move) 
+					#self.my_state.team[self.active_pokemon].update_move(move)
+					#self.log('move status: ', move) 
 					#self.my_state.team[self.my_state.active_pokemon] 
 
-				self.log('my state team: ', self.my_state.team)
+				#self.log('my state team: ', self.my_state.team)
 				self.log('team health', self.team_health)
 				self.log('team abilities', self.team_abilities)
 				self.log('team items', self.team_items)
