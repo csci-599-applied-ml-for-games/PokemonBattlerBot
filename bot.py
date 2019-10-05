@@ -7,7 +7,6 @@ import time
 from datetime import datetime
 
 import showdown 
-import gamestate
 
 BOT_DIR = os.path.dirname(__file__)
 TYPE_MAP = {}
@@ -52,10 +51,6 @@ class BotClient(showdown.Client):
 	def get_team_info(data):
 		return data['side']['pokemon']
 
-	@staticmethod
-	def get_active_info(data):
-		return data['active']
-
 	async def switch_pokemon(self, room_obj, data):
 		team_info = self.get_team_info(data)
 		switch_available = []
@@ -71,7 +66,6 @@ class BotClient(showdown.Client):
 		action_count = move_count
 
 		team_info = self.get_team_info(data)
-
 		switch_available = []
 		for pokemon_index, pokemon_info in enumerate(team_info):
 			fainted = 'fnt' in pokemon_info.get('condition')
@@ -84,18 +78,7 @@ class BotClient(showdown.Client):
 
 		action = random.randint(1, action_count)
 		if action <= move_count:
-			await room_obj.move(action)
-		# so far the only way to use a mega is to pass it in the move room obj.
-		# and our only pokemon that can use a mega is swampert.
-		# this tests if this how you can activate a mega
-		elif ( action <= move_count and self.active_pokemon == 'Swampert'):
-			await room_obj.move(action, True)
-		elif ( action <= move_count and self.active_pokemon == 'Manaphy' and not self.z_power):
-			# comment this out if it doesn't work
-			# We get a param canZMove when a pokemon that has Z move available is active.
-			# Don't think we currently track this.
-			# Gets a move called 'Hydro Vortex' ID isn't listed but this is my guess.
-			await room_obj.move('hydrovortex')
+			await room_obj.move(action) 
 		else:
 			switch_index = switch_available[action - (move_count + 1)]
 			await room_obj.switch(switch_index)
@@ -153,9 +136,8 @@ class BotClient(showdown.Client):
 					self.log(f'Team: {self.team}')
 					self.log(f'Opp team: {self.opp_team}')
 					
-					# create the state trackers... this should only be created once if I put this here yea?
-					self.enemy_state = gamestate.EnemyState(self.opp_team)
-					self.my_state = gamestate.PlayerState(self.team)
+					# create the enemy state tracker... this should only be created once if I put this here yea?
+					self.enemy_state = EnemyState(self.opp_team)
 
 					#NOTE: Select starting pokemon here 
 					start_index = random.randint(1, self.teamsize)
@@ -184,70 +166,22 @@ class BotClient(showdown.Client):
 				data = json.loads(json_string)
 				self.last_request_data = data
 				team_info = self.get_team_info(data)
-				active_info = self.get_active_info(data)
-				self.log('active info:', active_info[0])
-				self.team_health = {}
 				self.team_abilities = {}
 				self.team_items = {}
 				self.team_moves = {}
-				
 				for pokemon_info in team_info:
 					self.log('info', pokemon_info)
-					# get health for each pokemon
-					self.team_health[str(pokemon_info['details'].rstrip(', M').rstrip(', F'))] = pokemon_info['condition']
 					# get the ability for each pokemon
 					self.team_abilities[str(pokemon_info['details'].rstrip(', M').rstrip(', F'))] = pokemon_info['ability']
 					# track the items each pokemon
 					self.team_items[str(pokemon_info['details'].rstrip(', M').rstrip(', F'))] = pokemon_info['item']
 					# track the team movelist?
 					self.team_moves[str(pokemon_info['details'].rstrip(', M').rstrip(', F'))] = pokemon_info['moves']
-					
-					if pokemon_info.get('active'):
-						self.active_pokemon = pokemon_info['details'].rstrip(', M').rstrip(', F')
+					# if pokemon_info.get('active'):
+						# self.active_pokemon = pokemon_info['details'].rstrip(', M').rstrip(', F')
 						# self.log('active_pokemon', self.active_pokemon)
 						# self.log('active_pokemon types', TYPE_MAP.get(self.active_pokemon))
 						#break // removed this line so it would get all the moves and stuff and things ya know
-
-				#check if we can z power
-				for info in active_info[0]:
-					if info == 'canZMove':
-						self.z_power_json= active_info[0]['canZMove']
-						self.log('Zpower json', self.z_power_json)
-						z_list = active_info[0]['canZMove']
-						print(z_list)
-						try:
-							self.z_power_name = active_info[0]['canZMove'][1]['move']
-							self.z_power_name = self.z_power_name.strip(' ').lower()
-							self.log('Z Power Name:', self.z_power_name)
-						except:
-							self.log('Z Power Parse Error')
-						# Theres a Z Power we don't know which spot this is going to be in
-						# Wont iterate for some reason??? crashes
-						#for z_move in active_info[0]['canZMove']
-							#if z_move != None:
-								#z_power_move = z_move['move']
-								#self.z_power_name = z_power_move.strip(' ').lower()
-								#self.log('Z Power Move:', self.z_power_name)
-					elif info == 'canMegaEvo':
-						self.can_mega = active_info[0]['canMegaEvo']
-						self.log('Active Can Mega: ', active_info[0]['canMegaEvo'])
-
-				# get the status of my moves
-				#for move in active_info['moves']:
-					#self.log('active info', active_info)
-					# returns a lot of data.
-					# stores in dict (probably won't work tbh)
-					#if move['id'] in self.my_state.team_moves[self.active_pokemon]['id']:
-						#self.my_state.team_moves[self.active_pokemon] = move
-					#else:
-						#self.my_state.team_moves[self.active_pokemon].append(move)
-					# stores in object
-					#self.my_state.team[self.active_pokemon].update_move(move)
-					#self.log('move status: ', move) 
-					#self.my_state.team[self.my_state.active_pokemon] 
-
-				#self.log('my state team: ', self.my_state.team)
-				self.log('team health', self.team_health)
 				self.log('team abilities', self.team_abilities)
 				self.log('team items', self.team_items)
 				self.log('team moves', self.team_moves)	
@@ -494,6 +428,72 @@ class BotClient(showdown.Client):
 			self.opp_sidestart = []
 
 			self.weather = 'none'
+
+# JK this is not a template don't delete.
+class EnemyState():
+	# class to track the enemy state
+	# 
+	def __init__(self, opposing_team):
+		self.active_pokemon = None
+		self.team_status = {}
+		self.team_type_map = {}
+		self.team_abilities = {} # this will have to be tracked through damage
+		self.team_moves = {}
+		self.team_mega = {} # Pokemon that has an active mega evolution.
+		self.team_zpower = {} # Pokemon that has already used a Zpower
+		self.pokemon_items = {}
+		# add future states
+
+		self.__parse_pokemon_names(opposing_team)
+		self.__create_movelist()
+	# end __init__
+
+	def __parse_pokemon_names(self, team):
+		for pokemon in team:
+			pokemon_name = str(pokemon.rstrip(', M').rstrip(', F'))
+			self.team_status[pokemon_name] = None
+	# end __parse_pokemon_names
+
+	# create empty movelist array for each pokemon
+	def __create_movelist(self):
+		for pokemon in self.team_status:
+			self.team_moves[pokemon] = []
+	# end __create__movelist			
+
+	def update_active(self, active):
+		self.active_pokemon = active
+	# end update_active	
+	
+	def update_moves_list(self, pokemon, move):
+		if move not in self.team_moves[pokemon]:
+			self.team_moves[pokemon].append(move)
+	# end update_moves_list
+
+	def update_abilities(self, pokemon, ability):
+		self.team_abilities[str(pokemon)] = ability
+	# end update_abilities
+	
+	def update_team_mega(self, pokemon):
+		self.team_mega[pokemon] = True
+		# TODO: Megas go inactive once the pokemon faints... add code to switch if pokemon faints
+	# end update_team_mega
+
+	def update_used_zpower(self, pokemon):
+		self.team_zpower[pokemon] = True
+
+# We should add a pokemon object with everything.
+# Template
+class Pokemon():
+	# Pokemon object... useful maybe?
+	def __init__(self):
+		self.health_points = None
+		self.status = None			
+		self.type = None
+		self.ability = None	
+		self.moves = None
+		self.mega = None
+		self.items = None
+
 
 def main():
 	if len(sys.argv) != 5 and len(sys.argv) != 6:
