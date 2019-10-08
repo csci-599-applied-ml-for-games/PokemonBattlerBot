@@ -53,6 +53,10 @@ class BotClient(showdown.Client):
 	def get_team_info(data):
 		return data['side']['pokemon']
 
+	@staticmethod
+	def get_active_info(data):
+		return data['active']
+
 	async def switch_pokemon(self, room_obj, data):
 		team_info = self.get_team_info(data)
 		switch_available = []
@@ -81,6 +85,18 @@ class BotClient(showdown.Client):
 		action = random.randint(1, action_count)
 		if action <= move_count:
 			await room_obj.move(action) 
+		# so far the only way to use a mega is to pass it in the move room obj.
+		# and our only pokemon that can use a mega is swampert.
+		# this tests if this how you can activate a mega
+		elif ( action <= move_count and self.active_pokemon == 'Swampert'):
+			await room_obj.move(action, True) #NOTE: Tested this and it works.
+		#elif ( action <= move_count and self.active_pokemon == 'Manaphy' and not self.z_power):
+			# comment this out if it doesn't work
+			# We get a param canZMove when a pokemon that has Z move available is active.
+			# Don't think we currently track this.
+			# Gets a move called 'Hydro Vortex' ID isn't listed but this is my guess.
+			# NOTE: Currently Z using the indices 5,6 don't work for Z power. unsure of how to trigger based on room_obj class.
+			#await room_obj.move('hydrovortex') 
 		else:
 			switch_index = switch_available[action - (move_count + 1)]
 			await room_obj.switch(switch_index)
@@ -213,6 +229,34 @@ class BotClient(showdown.Client):
 
 					await self.switch_pokemon(room_obj, data)
 				else:
+					# adding code here for active info since it doesn't exist when a force switch is required.
+					active_info = self.get_active_info(data)
+					self.log('active info:', active_info[0])
+
+					#check if we can z power
+					for info in active_info[0]:
+						if info == 'canZMove':
+							self.z_power_json= active_info[0]['canZMove']
+							self.log('Zpower json', self.z_power_json)
+							z_list = active_info[0]['canZMove']
+							print(z_list)
+							try:
+								self.z_power_name = active_info[0]['canZMove'][1]['move']
+								self.z_power_name = self.z_power_name.strip(' ').lower()
+								self.log('Z Power Name:', self.z_power_name)
+							except:
+								self.log('Z Power Parse Error')
+							# Theres a Z Power we don't know which spot this is going to be in
+							# Wont iterate for some reason??? crashes
+							#for z_move in active_info[0]['canZMove']
+								#if z_move != None:
+									#z_power_move = z_move['move']
+									#self.z_power_name = z_power_move.strip(' ').lower()
+									#self.log('Z Power Move:', self.z_power_name)
+						elif info == 'canMegaEvo':
+							self.can_mega = active_info[0]['canMegaEvo']
+							self.log('Active Can Mega: ', active_info[0]['canMegaEvo'])
+
 					await self.action(room_obj, data)
 			
 			elif inp_type == '-status':
