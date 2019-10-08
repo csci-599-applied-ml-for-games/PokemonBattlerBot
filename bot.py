@@ -238,8 +238,6 @@ class BotClient(showdown.Client):
 						if info == 'canZMove':
 							self.z_power_json= active_info[0]['canZMove']
 							self.log('Zpower json', self.z_power_json)
-							z_list = active_info[0]['canZMove']
-							print(z_list)
 							try:
 								self.z_power_name = active_info[0]['canZMove'][1]['move']
 								self.z_power_name = self.z_power_name.strip(' ').lower()
