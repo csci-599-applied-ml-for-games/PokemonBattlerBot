@@ -233,6 +233,10 @@ class GameState():
 		type_position = TYPE_NAME_TO_INDEX.get(type_name, TYPE_NAME_TO_INDEX['NotFound'])
 		self._set_type(player, team_position, type_position, 1.0)
 
+	def set_types(self, player, name, type_names):
+		for type_name in type_names:
+			self.set_type(player, name, type_name)
+			
 	def check_types(self, player, name):
 		name = GameState.pokemon_name_clean(name)
 		types = []

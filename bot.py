@@ -126,9 +126,18 @@ class BotClient(showdown.Client):
 		self.gs.set_team(player, team)
 		for position, member in enumerate(team):
 			vector_pokemon = self.gs.check_team_position(player, position)
+			self.log(f'Vector team member: {vector_pokemon}')
+
 			if member != vector_pokemon:
 				self.log('WARNING: mismatched pokemon')
-			self.log(f'Vector team: {vector_pokemon}')
+			else:
+				types = TYPE_MAP.get(vector_pokemon)
+				self.log(f'{vector_pokemon} has types from TYPE_MAP: {types}')
+				self.gs.set_types(player, vector_pokemon, types)
+				has_types = self.gs.check_types(player, vector_pokemon)
+				if set(has_types) != set(types):
+					self.log(f'WARNING: {vector_pokemon} has unexpected types')
+				self.log(f'{vector_pokemon} has types {has_types}')
 
 	async def on_receive(self, room_id, inp_type, params):
 		self.log(f'Input type: {inp_type}')
@@ -150,7 +159,6 @@ class BotClient(showdown.Client):
 					self.log(f'Team: {self.team}')
 					self.log(f'Opp team: {self.opp_team}')
 					
-					# create the enemy state tracker... this should only be created once if I put this here yea?
 					self.gs = GameState()
 					self.set_and_check_team(GameState.Player.one, self.team)
 					self.set_and_check_team(GameState.Player.two, self.opp_team)
@@ -310,8 +318,6 @@ class BotClient(showdown.Client):
 				else:
 					self.active_pokemon = new_active_name
 					self.log('active_pokemon', self.active_pokemon)
-					self.log('active_pokemon types', 
-						TYPE_MAP.get(self.active_pokemon))
 					self.set_active(GameState.Player.one, self.active_pokemon)
 					if not self.gs.check_active(GameState.Player.one, 
 						self.active_pokemon):
