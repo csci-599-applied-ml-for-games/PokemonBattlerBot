@@ -118,6 +118,14 @@ class BotClient(showdown.Client):
 		await self.send_challenge(self.expected_opponent, self.team_text, 
 			'gen7ou')
 
+	def set_and_check_team(self, player, team):
+		self.gs.set_team(player, team)
+		for position, member in enumerate(team):
+			vector_pokemon = self.gs.check_team_position(player, position)
+			if member != vector_pokemon:
+				self.log('WARNING: mismatched pokemon')
+			self.log(f'Vector team: {vector_pokemon}')
+
 	async def on_receive(self, room_id, inp_type, params):
 		self.log(f'Input type: {inp_type}')
 		self.log(f'Params: {params}')
@@ -126,7 +134,7 @@ class BotClient(showdown.Client):
 		if room_obj and room_obj.id.startswith('battle-'):
 			if inp_type == 'poke':
 				owner = params[0]
-				pokename = params[1]
+				pokename = GameState.pokemon_name_clean(params[1])
 				if owner == self.position:
 					self.team.append(pokename)
 				else:
@@ -140,6 +148,8 @@ class BotClient(showdown.Client):
 					
 					# create the enemy state tracker... this should only be created once if I put this here yea?
 					self.gs = GameState()
+					self.set_and_check_team(GameState.Player.one, self.team)
+					self.set_and_check_team(GameState.Player.two, self.opp_team)
 
 					#NOTE: Select starting pokemon here 
 					start_index = random.randint(1, self.teamsize)
@@ -431,72 +441,6 @@ class BotClient(showdown.Client):
 			self.opp_sidestart = []
 
 			self.weather = 'none'
-
-# JK this is not a template don't delete.
-class EnemyState():
-	# class to track the enemy state
-	# 
-	def __init__(self, opposing_team):
-		self.active_pokemon = None
-		self.team_status = {}
-		self.team_type_map = {}
-		self.team_abilities = {} # this will have to be tracked through damage
-		self.team_moves = {}
-		self.team_mega = {} # Pokemon that has an active mega evolution.
-		self.team_zpower = {} # Pokemon that has already used a Zpower
-		self.pokemon_items = {}
-		# add future states
-
-		self.__parse_pokemon_names(opposing_team)
-		self.__create_movelist()
-	# end __init__
-
-	def __parse_pokemon_names(self, team):
-		for pokemon in team:
-			pokemon_name = str(pokemon.rstrip(', M').rstrip(', F'))
-			self.team_status[pokemon_name] = None
-	# end __parse_pokemon_names
-
-	# create empty movelist array for each pokemon
-	def __create_movelist(self):
-		for pokemon in self.team_status:
-			self.team_moves[pokemon] = []
-	# end __create__movelist			
-
-	def update_active(self, active):
-		self.active_pokemon = active
-	# end update_active	
-	
-	def update_moves_list(self, pokemon, move):
-		if move not in self.team_moves[pokemon]:
-			self.team_moves[pokemon].append(move)
-	# end update_moves_list
-
-	def update_abilities(self, pokemon, ability):
-		self.team_abilities[str(pokemon)] = ability
-	# end update_abilities
-	
-	def update_team_mega(self, pokemon):
-		self.team_mega[pokemon] = True
-		# TODO: Megas go inactive once the pokemon faints... add code to switch if pokemon faints
-	# end update_team_mega
-
-	def update_used_zpower(self, pokemon):
-		self.team_zpower[pokemon] = True
-
-# We should add a pokemon object with everything.
-# Template
-class Pokemon():
-	# Pokemon object... useful maybe?
-	def __init__(self):
-		self.health_points = None
-		self.status = None			
-		self.type = None
-		self.ability = None	
-		self.moves = None
-		self.mega = None
-		self.items = None
-
 
 def main():
 	if len(sys.argv) != 5 and len(sys.argv) != 6:
