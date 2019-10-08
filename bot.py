@@ -89,6 +89,10 @@ class BotClient(showdown.Client):
 		return pokemon_data.startswith(self.position)
 
 	@staticmethod
+	def get_owner(pokemon_data):
+		return pokemon_data.split(':')[0].strip()
+
+	@staticmethod
 	def get_pokemon(pokemon_data):
 		return pokemon_data.split(':')[1].strip()
 
@@ -279,10 +283,12 @@ class BotClient(showdown.Client):
 					self.remove_status(self.opp_statuses, pokemon_name, status)
 
 			elif inp_type == 'switch':
-				pokemon_data = params[0]
+				name_with_owner = params[0]
+				name_with_details = params[1]
+				my_pokemon = self.own_pokemon(name_with_owner)
 
 				volatile_statuses = ['confusion', 'curse']
-				if self.own_pokemon(pokemon_data):
+				if my_pokemon:
 					pokemon_name = self.active_pokemon
 					statuses = self.statuses
 				else:
@@ -291,13 +297,27 @@ class BotClient(showdown.Client):
 				for volatile_status in volatile_statuses:
 					self.remove_status(statuses, pokemon_name, volatile_status)
 
-				if not self.own_pokemon(pokemon_data):
-					self.opp_active_pokemon = self.get_pokemon(pokemon_data)
+				new_active_name = GameState.pokemon_name_clean(name_with_details)
+				if not my_pokemon:
+					self.opp_active_pokemon = new_active_name
 					self.log('Opp active', self.opp_active_pokemon)
+					self.set_active(GameState.Player.two, self.opp_active_pokemon)
+					if not self.gs.check_active(GameState.Player.two, 
+						self.opp_active_pokemon):
+						
+						self.log(f'WARNING: {self.opp_active_pokemon}'
+							' was not active as expected')
 				else:
-					self.active_pokemon = self.get_pokemon(pokemon_data)
+					self.active_pokemon = new_active_name
 					self.log('active_pokemon', self.active_pokemon)
-					self.log('active_pokemon types', TYPE_MAP.get(self.active_pokemon))
+					self.log('active_pokemon types', 
+						TYPE_MAP.get(self.active_pokemon))
+					self.set_active(GameState.Player.one, self.active_pokemon)
+					if not self.gs.check_active(GameState.Player.one, 
+						self.active_pokemon):
+						
+						self.log(f'WARNING: {self.opp_active_pokemon}'
+							' was not active as expected')
 
 			elif inp_type == 'weather':
 				self.weather = params[0]
