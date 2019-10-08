@@ -316,7 +316,7 @@ class BotClient(showdown.Client):
 					if not self.gs.check_active(GameState.Player.one, 
 						self.active_pokemon):
 						
-						self.log(f'WARNING: {self.opp_active_pokemon}'
+						self.log(f'WARNING: {self.active_pokemon}'
 							' was not active as expected')
 
 			elif inp_type == 'weather':
