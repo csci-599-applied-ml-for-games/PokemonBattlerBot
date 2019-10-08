@@ -5,6 +5,7 @@ import json
 import csv
 import time
 from datetime import datetime
+from enum import Enum, auto
 
 import showdown 
 
@@ -13,10 +14,19 @@ from gamestate import GameState
 BOT_DIR = os.path.dirname(__file__)
 TYPE_MAP = {}
 
+#EXLORATION SETTINGS
+epsilon = 1  # not a constant, going to be decayed
+EPSILON_DECAY = 0.99975
+MIN_EPSILON = 0.001
+
+class Model(Enum):
+	Random = auto()
+	DQN = auto()
+
 class BotClient(showdown.Client):
 	def __init__(self, name='', password='', loop=None, max_room_logs=5000,
 		server_id='showdown', server_host=None, expected_opponent=None,
-		team=None, challenge=False, iterations=1):
+		team=None, challenge=False, iterations=1, model=Model.Random):
 
 		if expected_opponent == None:
 			raise Exception("No expected opponent found in arguments")
@@ -35,6 +45,8 @@ class BotClient(showdown.Client):
 
 		self.datestring = datetime.now().strftime('%y-%m-%d-%H-%M-%S')
 
+		self.model = model
+		
 		super().__init__(name=name, password=password, loop=loop, 
 			max_room_logs=max_room_logs, server_id=server_id, 
 			server_host=server_host)
@@ -78,7 +90,12 @@ class BotClient(showdown.Client):
 
 		action_count += len(switch_available)
 
-		action = random.randint(1, action_count)
+		if self.model == Model.Random:
+			action = random.randint(1, action_count)
+		elif self.model == Model.DQN:
+			self.log('Using DQN')
+			action = random.randint(1, action_count)
+
 		if action <= move_count:
 			await room_obj.move(action) 
 		else:
@@ -495,9 +512,10 @@ def main():
 			if type2 != '':
 				TYPE_MAP[name].append(type2)
 
+
 	BotClient(name=username, password=password, 
 		expected_opponent=expected_opponent, team=team, 
-		challenge=challenge, iterations=iterations).start()
+		challenge=challenge, iterations=iterations, model=Model.DQN).start()
 
 if __name__ == '__main__':
 	random.seed()
