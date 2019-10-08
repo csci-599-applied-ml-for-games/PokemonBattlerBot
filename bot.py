@@ -88,14 +88,14 @@ class BotClient(showdown.Client):
 		# so far the only way to use a mega is to pass it in the move room obj.
 		# and our only pokemon that can use a mega is swampert.
 		# this tests if this how you can activate a mega
-		elif ( action <= move_count and self.active_pokemon == 'Swampert'):
-			await room_obj.move(action, True)
-		elif ( action <= move_count and self.active_pokemon == 'Manaphy' and not self.z_power):
+		#elif ( action <= move_count and self.active_pokemon == 'Swampert'):
+			#await room_obj.move(action, True)
+		#elif ( action <= move_count and self.active_pokemon == 'Manaphy' and not self.z_power):
 			# comment this out if it doesn't work
 			# We get a param canZMove when a pokemon that has Z move available is active.
 			# Don't think we currently track this.
 			# Gets a move called 'Hydro Vortex' ID isn't listed but this is my guess.
-			await room_obj.move('hydrovortex')
+			#await room_obj.move('hydrovortex')
 		else:
 			switch_index = switch_available[action - (move_count + 1)]
 			await room_obj.switch(switch_index)
@@ -184,8 +184,6 @@ class BotClient(showdown.Client):
 				data = json.loads(json_string)
 				self.last_request_data = data
 				team_info = self.get_team_info(data)
-				active_info = self.get_active_info(data)
-				self.log('active info:', active_info[0])
 				self.team_health = {}
 				self.team_abilities = {}
 				self.team_items = {}
@@ -207,30 +205,6 @@ class BotClient(showdown.Client):
 						# self.log('active_pokemon', self.active_pokemon)
 						# self.log('active_pokemon types', TYPE_MAP.get(self.active_pokemon))
 						#break // removed this line so it would get all the moves and stuff and things ya know
-
-				#check if we can z power
-				for info in active_info[0]:
-					if info == 'canZMove':
-						self.z_power_json= active_info[0]['canZMove']
-						self.log('Zpower json', self.z_power_json)
-						z_list = active_info[0]['canZMove']
-						print(z_list)
-						try:
-							self.z_power_name = active_info[0]['canZMove'][1]['move']
-							self.z_power_name = self.z_power_name.strip(' ').lower()
-							self.log('Z Power Name:', self.z_power_name)
-						except:
-							self.log('Z Power Parse Error')
-						# Theres a Z Power we don't know which spot this is going to be in
-						# Wont iterate for some reason??? crashes
-						#for z_move in active_info[0]['canZMove']
-							#if z_move != None:
-								#z_power_move = z_move['move']
-								#self.z_power_name = z_power_move.strip(' ').lower()
-								#self.log('Z Power Move:', self.z_power_name)
-					elif info == 'canMegaEvo':
-						self.can_mega = active_info[0]['canMegaEvo']
-						self.log('Active Can Mega: ', active_info[0]['canMegaEvo'])
 
 				# get the status of my moves
 				#for move in active_info['moves']:
@@ -262,6 +236,34 @@ class BotClient(showdown.Client):
 
 					await self.switch_pokemon(room_obj, data)
 				else:
+
+					active_info = self.get_active_info(data)
+					self.log('active info:', active_info[0])
+
+					#check if we can z power
+					for info in active_info[0]:
+						if info == 'canZMove':
+							self.z_power_json= active_info[0]['canZMove']
+							self.log('Zpower json', self.z_power_json)
+							z_list = active_info[0]['canZMove']
+							print(z_list)
+							try:
+								self.z_power_name = active_info[0]['canZMove'][1]['move']
+								self.z_power_name = self.z_power_name.strip(' ').lower()
+								self.log('Z Power Name:', self.z_power_name)
+							except:
+								self.log('Z Power Parse Error')
+							# Theres a Z Power we don't know which spot this is going to be in
+							# Wont iterate for some reason??? crashes
+							#for z_move in active_info[0]['canZMove']
+								#if z_move != None:
+									#z_power_move = z_move['move']
+									#self.z_power_name = z_power_move.strip(' ').lower()
+									#self.log('Z Power Move:', self.z_power_name)
+						elif info == 'canMegaEvo':
+							self.can_mega = active_info[0]['canMegaEvo']
+							self.log('Active Can Mega: ', active_info[0]['canMegaEvo'])
+
 					await self.action(room_obj, data)
 			
 			elif inp_type == '-status':
