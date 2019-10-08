@@ -8,6 +8,8 @@ from datetime import datetime
 
 import showdown 
 
+from gamestate import GameState
+
 BOT_DIR = os.path.dirname(__file__)
 TYPE_MAP = {}
 
@@ -137,7 +139,7 @@ class BotClient(showdown.Client):
 					self.log(f'Opp team: {self.opp_team}')
 					
 					# create the enemy state tracker... this should only be created once if I put this here yea?
-					self.enemy_state = EnemyState(self.opp_team)
+					self.gs = GameState()
 
 					#NOTE: Select starting pokemon here 
 					start_index = random.randint(1, self.teamsize)
@@ -171,12 +173,13 @@ class BotClient(showdown.Client):
 				self.team_moves = {}
 				for pokemon_info in team_info:
 					self.log('info', pokemon_info)
+					pokemon_name = GameState.pokemon_name_clean(pokemon_info['details'])
 					# get the ability for each pokemon
-					self.team_abilities[str(pokemon_info['details'].rstrip(', M').rstrip(', F'))] = pokemon_info['ability']
+					self.team_abilities[pokemon_name] = pokemon_info['ability']
 					# track the items each pokemon
-					self.team_items[str(pokemon_info['details'].rstrip(', M').rstrip(', F'))] = pokemon_info['item']
+					self.team_items[pokemon_name] = pokemon_info['item']
 					# track the team movelist?
-					self.team_moves[str(pokemon_info['details'].rstrip(', M').rstrip(', F'))] = pokemon_info['moves']
+					self.team_moves[pokemon_name] = pokemon_info['moves']
 					# if pokemon_info.get('active'):
 						# self.active_pokemon = pokemon_info['details'].rstrip(', M').rstrip(', F')
 						# self.log('active_pokemon', self.active_pokemon)
@@ -354,7 +357,7 @@ class BotClient(showdown.Client):
 				if (len(params) == 4):
 					pokemon = params[3].strip('[of] p1a: ')
 					ability = params[2].strip('[from] ability: ')
-					self.enemy_state.update_abilities(pokemon, ability)
+					# self.enemy_state.update_abilities(pokemon, ability)
 					self.log('Pokemon: ', pokemon, 'Enemy Ability: ', self.enemy_state.team_abilities[pokemon])
 			
 			elif inp_type == '-mega':
@@ -362,7 +365,7 @@ class BotClient(showdown.Client):
 					# Opposing player Mega 
 					# TODO: Add which pokemon used 
 					pokemon = params[0].strip('p1a: ') # just easier to read this way
-					self.enemy_state.update_team_mega(pokemon)
+					# self.enemy_state.update_team_mega(pokemon)
 					self.opp_mega = True
 					self.log('Enemy Mega Active: ', self.enemy_state.team_mega[pokemon])
 				else:
@@ -378,7 +381,7 @@ class BotClient(showdown.Client):
 				if ('p1a' in str(params[0])):
 					# player 1 active pokemon used move.
 					pokemon = params[0].strip('p1a: ')
-					self.enemy_state.update_moves_list(pokemon, params[1])
+					# self.enemy_state.update_moves_list(pokemon, params[1])
 					self.log('P1 used: ', params[1])
 					self.log('Enemy Moves State:', self.enemy_state.team_moves)
 				else:
@@ -390,7 +393,7 @@ class BotClient(showdown.Client):
 				if ('p1a' in str(params[0])):
 					# opposing player used Z Power
 					pokemon = params[0].strip('p1a: ')
-					self.enemy_state.update_used_zpower(pokemon)
+					# self.enemy_state.update_used_zpower(pokemon)
 					self.opp_zpower = True
 				else:
 					# Add which pokemon used the zpower obviously but should discuss data structure 
