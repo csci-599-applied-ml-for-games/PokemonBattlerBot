@@ -14,6 +14,10 @@ from gamestate import GameState
 BOT_DIR = os.path.dirname(__file__)
 TYPE_MAP = {}
 
+class ActionType(Enum):
+	Move = auto()
+	Switch = auto()
+
 class ModelType(Enum):
 	Random = auto()
 	DQN = auto()
@@ -23,7 +27,8 @@ class RandomModel():
 		self.type = ModelType.Random
 
 	def get_action(self, state, valid_actions):
-		return random.choice(valid_actions)
+		#NOTE: Adding the None tuple is for compatibility with DQN 
+		return random.choice(valid_actions) + (None,)
 
 	def update_replay_memory(*args, **kwargs):
 		pass
@@ -91,30 +96,36 @@ class BotClient(showdown.Client):
 		self.log(f'data: {data}')
 		moves = data.get('active')[0].get('moves')
 		self.log(f'Moves: {moves}')
-
+		valid_actions = []
+		for move_index, move_data in enumerate(moves):
+			valid_actions.append((move_index + 1, 
+				move_data['move'], 
+				ActionType.Move))
 		move_count = len(moves)
-		action_count = move_count
 
 		team_info = self.get_team_info(data)
-		switch_available = []
 		for pokemon_index, pokemon_info in enumerate(team_info):
 			fainted = 'fnt' in pokemon_info.get('condition')
 			if (not pokemon_info.get('active', False) and 
 				not fainted):
+				self.log('cleaning name')
+				pokemon_name = self.gs.pokemon_name_clean(pokemon_info['details'])
+				self.log('appending')
+				valid_actions.append((pokemon_index + 1 , 
+					pokemon_name, 
+					ActionType.Switch))
 				
-				switch_available.append(pokemon_index + 1)
+		self.log(f'valid_actions: {valid_actions}')
 
-		action_count += len(switch_available)
+		action_index, action_string, action_type, self.action = \
+			self.model.get_action(self.state_vl, valid_actions)
 
-		self.state_vl = self.gs.vector_list
-		self.action = self.model.get_action(self.state_vl, 
-			range(1, action_count + 1))
-
-		if self.action <= move_count:
-			await room_obj.move(self.action) 
+		if action_type == ActionType.Move:
+			await room_obj.move(action_index) 
+		elif action_type == ActionType.Switch:
+			await room_obj.switch(action_index)
 		else:
-			switch_index = switch_available[self.action - (move_count + 1)]
-			await room_obj.switch(switch_index)
+			self.log(f'Unexpected action type {action_type}')
 
 	def own_pokemon(self, pokemon_data):
 		return pokemon_data.startswith(self.position)
