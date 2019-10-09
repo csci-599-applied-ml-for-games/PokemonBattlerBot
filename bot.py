@@ -14,19 +14,27 @@ from gamestate import GameState
 BOT_DIR = os.path.dirname(__file__)
 TYPE_MAP = {}
 
-#EXLORATION SETTINGS
-epsilon = 1  # not a constant, going to be decayed
-EPSILON_DECAY = 0.99975
-MIN_EPSILON = 0.001
-
-class Model(Enum):
+class ModelType(Enum):
 	Random = auto()
 	DQN = auto()
+
+class RandomModel():
+	def __init__(self):
+		self.type = ModelType.Random
+
+	def get_action(self, state, valid_actions):
+		return random.choice(valid_actions)
+
+	def update_replay_memory(*args, **kwargs):
+		pass
+
+	def train(*args, **kwargs):
+		pass
 
 class BotClient(showdown.Client):
 	def __init__(self, name='', password='', loop=None, max_room_logs=5000,
 		server_id='showdown', server_host=None, expected_opponent=None,
-		team=None, challenge=False, iterations=1, model=Model.Random):
+		team=None, challenge=False, iterations=1, model=None):
 
 		if expected_opponent == None:
 			raise Exception("No expected opponent found in arguments")
@@ -45,8 +53,13 @@ class BotClient(showdown.Client):
 
 		self.datestring = datetime.now().strftime('%y-%m-%d-%H-%M-%S')
 
-		self.model = model
-		
+		if model == None:
+			self.model = RandomModel()
+		else:
+			self.model = model
+		self.state_vl = None
+		self.action = None
+
 		super().__init__(name=name, password=password, loop=loop, 
 			max_room_logs=max_room_logs, server_id=server_id, 
 			server_host=server_host)
@@ -74,8 +87,11 @@ class BotClient(showdown.Client):
 		switch_index = random.choice(switch_available)
 		await room_obj.switch(switch_index)
 
-	async def action(self, room_obj, data):
+	async def take_action(self, room_obj, data):
+		self.log(f'data: {data}')
 		moves = data.get('active')[0].get('moves')
+		self.log(f'Moves: {moves}')
+
 		move_count = len(moves)
 		action_count = move_count
 
@@ -90,16 +106,14 @@ class BotClient(showdown.Client):
 
 		action_count += len(switch_available)
 
-		if self.model == Model.Random:
-			action = random.randint(1, action_count)
-		elif self.model == Model.DQN:
-			self.log('Using DQN')
-			action = random.randint(1, action_count)
+		self.state_vl = self.gs.vector_list
+		self.action = self.model.get_action(self.state_vl, 
+			range(1, action_count + 1))
 
-		if action <= move_count:
-			await room_obj.move(action) 
+		if self.action <= move_count:
+			await room_obj.move(self.action) 
 		else:
-			switch_index = switch_available[action - (move_count + 1)]
+			switch_index = switch_available[self.action - (move_count + 1)]
 			await room_obj.switch(switch_index)
 
 	def own_pokemon(self, pokemon_data):
@@ -201,6 +215,22 @@ class BotClient(showdown.Client):
 
 			elif inp_type == 'turn':
 				self.turn_number = int(params[0])
+				if self.turn_number == 1:
+					self.state_vl = self.gs.vector_list
+				else:
+					#NOTE: this should be changed if using other reward functions besides win or lose the game
+					reward = 0
+					
+					last_state = [element for element in self.gs.vector_list]
+					self.state_vl = self.gs.vector_list
+					done = False
+
+					self.model.update_replay_memory((last_state, 
+						self.action, 
+						reward, 
+						self.state_vl, 
+						done))
+					self.model.train(False)
 
 			elif inp_type == 'request':
 				json_string = params[0]
@@ -238,7 +268,7 @@ class BotClient(showdown.Client):
 
 					await self.switch_pokemon(room_obj, data)
 				else:
-					await self.action(room_obj, data)
+					await self.take_action(room_obj, data)
 			
 			elif inp_type == '-status':
 				'''
@@ -380,7 +410,7 @@ class BotClient(showdown.Client):
 						await self.switch_pokemon(room_obj, 
 							self.last_request_data)
 					else:
-						await self.action(room_obj, self.last_request_data)
+						await self.take_action(room_obj, self.last_request_data)
 
 			elif inp_type == 'win':
 				winner = params[0]
@@ -515,7 +545,7 @@ def main():
 
 	BotClient(name=username, password=password, 
 		expected_opponent=expected_opponent, team=team, 
-		challenge=challenge, iterations=iterations, model=Model.DQN).start()
+		challenge=challenge, iterations=iterations, model=None).start()
 
 if __name__ == '__main__':
 	random.seed()
