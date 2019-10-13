@@ -74,6 +74,8 @@ class DQNAgent():
 		self.log('Saved replay_memory')
 
 		if len(self.replay_memory) < MIN_REPLAY_MEMORY_SIZE:
+			self.log(f'Not enough transitions to train. '
+				f'Only {len(self.replay_memory)} transitions')
 			return
 
 		minibatch = random.sample(self.replay_memory, MINIBATCH_SIZE)
