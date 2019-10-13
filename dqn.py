@@ -74,9 +74,12 @@ class DQNAgent():
 		return self.model.predict(state)
 
 	def decay_epsilon(self):
+		self.log('decay_epsilon')
 		if self.epsilon > self.min_epsilon:
+			self.log(f'Epsilon was {self.epsilon}')
 			self.epsilon *= self.epsilon_decay
 			self.epsilon = max(self.min_epsilon, self.epsilon)
+			self.log(f'Epsilon is now {self.epsilon}')
 
 	def get_action(self, state, valid_actions):
 		rv = random.choice(valid_actions) + (None,) 
