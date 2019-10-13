@@ -9,6 +9,8 @@ random.seed()
 import os
 from collections import deque
 
+from GameState import POKEMON_NAME_TO_INDEX, MOVE_NAME_TO_INDEX
+
 import numpy as np
 from keras.models import Sequential
 from keras.layers import Dense
@@ -21,11 +23,17 @@ REPLAY_MEMORY_SIZE = 50_000
 MIN_REPLAY_MEMORY_SIZE = 1000
 MINIBATCH_SIZE = 64
 
+class ActionType(Enum):
+	Move = auto()
+	Switch = auto()
+
 #5 pokemon to switch to, 4 moves for active pokemon
 #TODO: handle mega
 MAX_ACTION_SPACE_SIZE = 9
 class DQNAgent():
-	def __init__(self, input_shape, log_path=None, replay_memory_path=None):
+	def __init__(self, input_shape, log_path=None, replay_memory_path=None, 
+		training=True):
+
 		self.input_shape = input_shape
 
 		self.model = self.create_model()
@@ -45,6 +53,8 @@ class DQNAgent():
 		self.log_path = log_path
 		self.replay_memory_path = replay_memory_path
 
+		self.training = training
+
 	def create_model(self):
 		model = Sequential()
 
@@ -63,11 +73,57 @@ class DQNAgent():
 		return self.model.predict(state)
 
 	def get_action(self, state, valid_actions):
-		qs = self.get_qs(np.array([state])) 
-		rv = random.choice(valid_actions) + (None,) #TODO: replace me!
-		return rv
+		rv = random.choice(valid_actions) + (None,) 
+
+		qs = self.get_qs(np.array([state]))
+		
+		#NOTE: sort actions so that our output indices always match the actions 
+		sorted_actions = []
+		for action_index, action_name, action_type in valid_actions:
+			try:
+				if action_type == ActionType.Move:
+					action_dqn_index = MOVE_NAME_TO_INDEX[action_name]
+				elif action_type == ActionType.Switch:
+					action_dqn_index = POKEMON_NAME_TO_INDEX[action_name]
+				else:
+					self.log('ERROR: Somehow found invalid action type: '
+						f'{action_type}')
+					return rv
+			except KeyError:
+				self.log(f'ERROR: Unrecognized action_name {action_name} ' 
+					f'with type {action_type}')
+				return rv
+
+			sorted_actions.append((action_dqn_index, action_index, action_name, 
+				action_type))
+		
+		sorted_actions = sorted(sorted_actions, key=lambda x: x[0])
+		
+		#NOTE: now sort by q values
+		formatted_actions = []
+		for q_index, action_dqn_index, action_index, action_name, action_type \
+			in enumerate(sorted_actions):
+
+			try:
+				formatted_actions.append(q_index, qs[q_index], 
+					(action_index, action_name, action_type))
+			except IndexError:
+				self.log(f'ERROR: Bad q_index {q_index}')
+				return rv
+
+		#NOTE: As epsilon grows small, we make fewer random choices
+		if self.training and random.random() <= epsilon: 
+			q_index, q_value, action = random.choice(formatted_actions)
+		else:
+			formatted_actions = sorted(formatted_actions, key=lambda x: x[1])
+			q_index, q_value, action = formatted_actions[-1]
+		
+		return action, q_index
 
 	def train(self, terminal_state):
+		if not self.training:
+			return
+
 		self.log('Saving replay_memory')
 		if self.replay_memory_path:
 			with open(self.replay_memory_path, 'w') as fd:

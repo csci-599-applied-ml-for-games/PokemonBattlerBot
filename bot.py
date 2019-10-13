@@ -10,15 +10,11 @@ from enum import Enum, auto
 import showdown 
 
 from gamestate import GameState
-from dqn import DQNAgent
+from dqn import DQNAgent, ActionType
 
 LOGS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
 BOT_DIR = os.path.dirname(__file__)
 TYPE_MAP = {}
-
-class ActionType(Enum):
-	Move = auto()
-	Switch = auto()
 
 class RandomModel():
 	def __init__(self):
