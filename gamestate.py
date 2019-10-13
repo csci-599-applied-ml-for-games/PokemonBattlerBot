@@ -97,9 +97,12 @@ class GameState():
 
 	num_player_elements = max_team_size * ATTRIBUTES_PER_POKEMON
 
+	@staticmethod
+	def vector_dimension():
+		return GameState.Player.count * GameState.num_player_elements
+
 	def __init__(self):
-		self.vector_list = [0.0 for _ in range(GameState.Player.count * 
-			GameState.num_player_elements)]
+		self.vector_list = [0.0 for _ in range(GameState.vector_dimension())]
 
 		#NOTE: for easy access to pokemon team position in the future
 		self.name_to_position = [{}, {}] 
@@ -233,6 +236,10 @@ class GameState():
 		type_position = TYPE_NAME_TO_INDEX.get(type_name, TYPE_NAME_TO_INDEX['NotFound'])
 		self._set_type(player, team_position, type_position, 1.0)
 
+	def set_types(self, player, name, type_names):
+		for type_name in type_names:
+			self.set_type(player, name, type_name)
+			
 	def check_types(self, player, name):
 		name = GameState.pokemon_name_clean(name)
 		types = []

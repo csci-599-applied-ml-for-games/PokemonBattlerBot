@@ -9,14 +9,30 @@ from datetime import datetime
 import showdown 
 
 from gamestate import GameState
+from dqn import DQNAgent, ActionType
 
+LOGS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
 BOT_DIR = os.path.dirname(__file__)
 TYPE_MAP = {}
+
+class RandomModel():
+	def __init__(self):
+		pass
+
+	def get_action(self, state, valid_actions):
+		#NOTE: Adding the None tuple is for compatibility with DQN 
+		return random.choice(valid_actions) + (None,)
+
+	def update_replay_memory(*args, **kwargs):
+		pass
+
+	def train(*args, **kwargs):
+		pass
 
 class BotClient(showdown.Client):
 	def __init__(self, name='', password='', loop=None, max_room_logs=5000,
 		server_id='showdown', server_host=None, expected_opponent=None,
-		team=None, challenge=False, iterations=1):
+		team=None, challenge=False, iterations=1, model=None):
 
 		if expected_opponent == None:
 			raise Exception("No expected opponent found in arguments")
@@ -27,26 +43,41 @@ class BotClient(showdown.Client):
 		else:
 			self.team_text = team
 
-		self.challenge = challenge
-		self.has_challenged = False
-
 		self.iterations_run = 0
 		self.iterations = iterations 
 
+		if model == None:
+			self.model = RandomModel()
+		else:
+			self.model = model
+		self.state_vl = None
+		self.action = None
+
+		self.logs_dir = LOGS_DIR
+		if not os.path.exists(self.logs_dir):
+			os.mkdir(self.logs_dir)
 		self.datestring = datetime.now().strftime('%y-%m-%d-%H-%M-%S')
+		self.update_log_paths()
+
+		self.challenge = challenge
+		self.has_challenged = False
 
 		super().__init__(name=name, password=password, loop=loop, 
 			max_room_logs=max_room_logs, server_id=server_id, 
 			server_host=server_host)
 
+	def update_log_paths(self):
+		self.log_file = os.path.join(self.logs_dir, 
+			f'{self.datestring}_Iteration{self.iterations_run}.txt')
+		self.model.log_path = self.log_file
+		self.model.replay_memory_path = os.path.join(self.logs_dir, 
+			f'{self.datestring}_Iteration{self.iterations_run}_'
+			'replaymemory.txt')
+
 	def log(self, *args):
 		l = [str(arg) for arg in args]
 		string = ' '.join(l)
-		logs_dir = os.path.join(os.path.dirname(__file__), 'logs')
-		if not os.path.exists(logs_dir):
-			os.mkdir(logs_dir)
-		log_file = f'{self.datestring}_Iteration{self.iterations_run}.txt'
-		with open(os.path.join(logs_dir, log_file), 'a') as fd:
+		with open(self.log_file, 'a') as fd:
 			fd.write(f'{string}\n')
 	
 	@staticmethod
@@ -66,40 +97,40 @@ class BotClient(showdown.Client):
 		switch_index = random.choice(switch_available)
 		await room_obj.switch(switch_index)
 
-	async def action(self, room_obj, data):
+	async def take_action(self, room_obj, data):
+		self.log(f'data: {data}')
 		moves = data.get('active')[0].get('moves')
+		self.log(f'Moves: {moves}')
+		valid_actions = []
+		for move_index, move_data in enumerate(moves):
+			valid_actions.append((move_index + 1, 
+				move_data['move'], 
+				ActionType.Move))
 		move_count = len(moves)
-		action_count = move_count
 
 		team_info = self.get_team_info(data)
-		switch_available = []
 		for pokemon_index, pokemon_info in enumerate(team_info):
 			fainted = 'fnt' in pokemon_info.get('condition')
 			if (not pokemon_info.get('active', False) and 
 				not fainted):
-				
-				switch_available.append(pokemon_index + 1)
+				self.log('cleaning name')
+				pokemon_name = self.gs.pokemon_name_clean(pokemon_info['details'])
+				self.log('appending')
+				valid_actions.append((pokemon_index + 1 , 
+					pokemon_name, 
+					ActionType.Switch))
+		
+		self.log(f'valid_actions: {valid_actions}')
 
-		action_count += len(switch_available)
+		action_index, action_string, action_type, self.action = \
+			self.model.get_action(self.gs.vector_list, valid_actions)
 
-		action = random.randint(1, action_count)
-		if action <= move_count:
-			await room_obj.move(action) 
-		# so far the only way to use a mega is to pass it in the move room obj.
-		# and our only pokemon that can use a mega is swampert.
-		# this tests if this how you can activate a mega
-		elif ( action <= move_count and self.active_pokemon == 'Swampert'):
-			await room_obj.move(action, True) #NOTE: Tested this and it works.
-		#elif ( action <= move_count and self.active_pokemon == 'Manaphy' and not self.z_power):
-			# comment this out if it doesn't work
-			# We get a param canZMove when a pokemon that has Z move available is active.
-			# Don't think we currently track this.
-			# Gets a move called 'Hydro Vortex' ID isn't listed but this is my guess.
-			# NOTE: Currently Z using the indices 5,6 don't work for Z power. unsure of how to trigger based on room_obj class.
-			#await room_obj.move('hydrovortex') 
+		if action_type == ActionType.Move:
+			await room_obj.move(action_index) 
+		elif action_type == ActionType.Switch:
+			await room_obj.switch(action_index)
 		else:
-			switch_index = switch_available[action - (move_count + 1)]
-			await room_obj.switch(switch_index)
+			self.log(f'Unexpected action type {action_type}')
 
 	def own_pokemon(self, pokemon_data):
 		return pokemon_data.startswith(self.position)
@@ -142,9 +173,18 @@ class BotClient(showdown.Client):
 		self.gs.set_team(player, team)
 		for position, member in enumerate(team):
 			vector_pokemon = self.gs.check_team_position(player, position)
+			self.log(f'Vector team member: {vector_pokemon}')
+
 			if member != vector_pokemon:
 				self.log('WARNING: mismatched pokemon')
-			self.log(f'Vector team: {vector_pokemon}')
+			else:
+				types = TYPE_MAP.get(vector_pokemon)
+				self.log(f'{vector_pokemon} has types from TYPE_MAP: {types}')
+				self.gs.set_types(player, vector_pokemon, types)
+				has_types = self.gs.check_types(player, vector_pokemon)
+				if set(has_types) != set(types):
+					self.log(f'WARNING: {vector_pokemon} has unexpected types')
+				self.log(f'{vector_pokemon} has types {has_types}')
 
 	async def on_receive(self, room_id, inp_type, params):
 		self.log(f'Input type: {inp_type}')
@@ -166,7 +206,6 @@ class BotClient(showdown.Client):
 					self.log(f'Team: {self.team}')
 					self.log(f'Opp team: {self.opp_team}')
 					
-					# create the enemy state tracker... this should only be created once if I put this here yea?
 					self.gs = GameState()
 					self.set_and_check_team(GameState.Player.one, self.team)
 					self.set_and_check_team(GameState.Player.two, self.opp_team)
@@ -192,6 +231,26 @@ class BotClient(showdown.Client):
 
 			elif inp_type == 'turn':
 				self.turn_number = int(params[0])
+				if self.turn_number == 1:
+					self.state_vl = self.gs.vector_list
+				else:
+					#NOTE: this should be changed if using other reward functions besides win or lose the game
+					reward = 0
+					
+					last_state = [element for element in self.state_vl]
+					self.state_vl = self.gs.vector_list
+					done = False
+
+					transition = (last_state, 
+						self.action, 
+						reward, 
+						self.state_vl, 
+						done)
+					self.log(f'Updating replay memory with {transition}')
+					self.model.update_replay_memory(transition)
+					self.log(f'Successfully updated replay memory')
+					self.model.train(False)
+					self.log(f'Trained')
 
 			elif inp_type == 'request':
 				json_string = params[0]
@@ -229,33 +288,7 @@ class BotClient(showdown.Client):
 
 					await self.switch_pokemon(room_obj, data)
 				else:
-					# adding code here for active info since it doesn't exist when a force switch is required.
-					active_info = self.get_active_info(data)
-					self.log('active info:', active_info[0])
-
-					#check if we can z power
-					for info in active_info[0]:
-						if info == 'canZMove':
-							self.z_power_json= active_info[0]['canZMove']
-							self.log('Zpower json', self.z_power_json)
-							try:
-								self.z_power_name = active_info[0]['canZMove'][1]['move']
-								self.z_power_name = self.z_power_name.strip(' ').lower()
-								self.log('Z Power Name:', self.z_power_name)
-							except:
-								self.log('Z Power Parse Error')
-							# Theres a Z Power we don't know which spot this is going to be in
-							# Wont iterate for some reason??? crashes
-							#for z_move in active_info[0]['canZMove']
-								#if z_move != None:
-									#z_power_move = z_move['move']
-									#self.z_power_name = z_power_move.strip(' ').lower()
-									#self.log('Z Power Move:', self.z_power_name)
-						elif info == 'canMegaEvo':
-							self.can_mega = active_info[0]['canMegaEvo']
-							self.log('Active Can Mega: ', active_info[0]['canMegaEvo'])
-
-					await self.action(room_obj, data)
+					await self.take_action(room_obj, data)
 			
 			elif inp_type == '-status':
 				'''
@@ -352,13 +385,11 @@ class BotClient(showdown.Client):
 				else:
 					self.active_pokemon = new_active_name
 					self.log('active_pokemon', self.active_pokemon)
-					self.log('active_pokemon types', 
-						TYPE_MAP.get(self.active_pokemon))
 					self.set_active(GameState.Player.one, self.active_pokemon)
 					if not self.gs.check_active(GameState.Player.one, 
 						self.active_pokemon):
 						
-						self.log(f'WARNING: {self.opp_active_pokemon}'
+						self.log(f'WARNING: {self.active_pokemon}'
 							' was not active as expected')
 
 			elif inp_type == 'weather':
@@ -399,16 +430,38 @@ class BotClient(showdown.Client):
 						await self.switch_pokemon(room_obj, 
 							self.last_request_data)
 					else:
-						await self.action(room_obj, self.last_request_data)
+						await self.take_action(room_obj, self.last_request_data)
 
 			elif inp_type == 'win':
+				done = True
+
 				winner = params[0]
 				if winner == self.name:
 					self.log("We won")
+					reward = 10000 #NOTE: Reward is chosen somewhat arbitrarily
 				else:
 					self.log("We lost")
+					reward = -10000
+
+				last_state = [element for element in self.state_vl]
+				self.state_vl = self.gs.vector_list
+				
+				transition = (last_state, 
+					self.action, 
+					reward, 
+					self.state_vl, 
+					done)
+				self.log(f'Updating replay memory with {transition}')
+				self.model.update_replay_memory(transition)
+				self.log(f'Successfully updated replay memory')
+				self.model.train(True)
+				self.log(f'Trained')
+				#TODO: save model so other client can keep improving...?
+				#TODO: or can they just both improve?
+					
 				await room_obj.leave()
 				self.iterations_run += 1
+				self.update_log_paths()
 				
 				if self.iterations_run < self.iterations:
 					self.log("Starting iteration {}".format(self.iterations_run))
@@ -531,9 +584,19 @@ def main():
 			if type2 != '':
 				TYPE_MAP[name].append(type2)
 
-	BotClient(name=username, password=password, 
-		expected_opponent=expected_opponent, team=team, 
-		challenge=challenge, iterations=iterations).start()
+	model_type = 'dqn' #TODO: move out to command line argument
+	if model_type == 'dqn':
+		input_shape = (GameState.vector_dimension(),)
+		BotClient(name=username, password=password, 
+			expected_opponent=expected_opponent, team=team, 
+			challenge=challenge, iterations=iterations, 
+			model=DQNAgent(input_shape)).start()
+	elif model_type == 'random':
+		input_shape = (GameState.vector_dimension(),)
+		BotClient(name=username, password=password, 
+			expected_opponent=expected_opponent, team=team, 
+			challenge=challenge, iterations=iterations, 
+			model=None).start()
 
 if __name__ == '__main__':
 	random.seed()
