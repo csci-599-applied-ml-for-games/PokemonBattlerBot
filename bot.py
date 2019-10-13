@@ -575,7 +575,8 @@ def main():
 	username = args['<username>']
 	password = args['<password>']
 	expected_opponent = args['<expected_opponent>']
-	iterations = args['--iterations'] if args['--iterations'] != None else 1 
+	iterations = (int(args['--iterations']) if args['--iterations'] != None 
+		else 1) 
 	challenge = args['--challenge']
 	model_type = args['--modeltype'] if args['--modeltype'] != None else 'dqn'
 
