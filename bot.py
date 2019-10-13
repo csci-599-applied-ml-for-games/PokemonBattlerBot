@@ -12,6 +12,7 @@ import showdown
 from gamestate import GameState
 from dqn import DQNAgent
 
+LOGS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
 BOT_DIR = os.path.dirname(__file__)
 TYPE_MAP = {}
 
@@ -47,13 +48,8 @@ class BotClient(showdown.Client):
 		else:
 			self.team_text = team
 
-		self.challenge = challenge
-		self.has_challenged = False
-
 		self.iterations_run = 0
 		self.iterations = iterations 
-
-		self.datestring = datetime.now().strftime('%y-%m-%d-%H-%M-%S')
 
 		if model == None:
 			self.model = RandomModel()
@@ -62,18 +58,31 @@ class BotClient(showdown.Client):
 		self.state_vl = None
 		self.action = None
 
+		self.logs_dir = LOGS_DIR
+		if not os.path.exists(self.logs_dir):
+			os.mkdir(self.logs_dir)
+		self.datestring = datetime.now().strftime('%y-%m-%d-%H-%M-%S')
+		self.update_log_paths()
+
+		self.challenge = challenge
+		self.has_challenged = False
+
 		super().__init__(name=name, password=password, loop=loop, 
 			max_room_logs=max_room_logs, server_id=server_id, 
 			server_host=server_host)
 
+	def update_log_paths(self):
+		self.log_file = os.path.join(self.logs_dir, 
+			f'{self.datestring}_Iteration{self.iterations_run}.txt')
+		self.model.log_path = self.log_file
+		self.model.replay_memory_path = os.path.join(self.logs_dir, 
+			f'{self.datestring}_Iteration{self.iterations_run}_'
+			'replaymemory.txt')
+
 	def log(self, *args):
 		l = [str(arg) for arg in args]
 		string = ' '.join(l)
-		logs_dir = os.path.join(os.path.dirname(__file__), 'logs')
-		if not os.path.exists(logs_dir):
-			os.mkdir(logs_dir)
-		log_file = f'{self.datestring}_Iteration{self.iterations_run}.txt'
-		with open(os.path.join(logs_dir, log_file), 'a') as fd:
+		with open(self.log_file, 'a') as fd:
 			fd.write(f'{string}\n')
 	
 	@staticmethod

@@ -24,7 +24,7 @@ MINIBATCH_SIZE = 64
 #TODO: handle mega
 MAX_ACTION_SPACE_SIZE = 9
 class DQNAgent():
-	def __init__(self, input_shape):
+	def __init__(self, input_shape, log_path=None, replay_memory_path=None):
 		self.input_shape = input_shape
 
 		self.model = self.create_model()
@@ -40,6 +40,9 @@ class DQNAgent():
 
 		self.target_update_counter = 0
 		self.update_target_every = 5
+
+		self.log_path = log_path
+		self.replay_memory_path = replay_memory_path
 
 	def create_model(self):
 		model = Sequential()
@@ -64,17 +67,23 @@ class DQNAgent():
 		return rv
 
 	def train(self, terminal_state):
-		if len(self.replay_memory) < MIN_REPLAY_SIZE:
+		self.log('Saving replay_memory')
+		if self.replay_memory_path:
+			with open(self.replay_memory_path, 'w') as fd:
+				fd.write(f'{self.replay_memory}')
+		self.log('Saved replay_memory')
+
+		if len(self.replay_memory) < MIN_REPLAY_MEMORY_SIZE:
 			return
 
 		minibatch = random.sample(self.replay_memory, MINIBATCH_SIZE)
-		
+
 		current_states = np.array([transition[0] for transition in minibatch])
 		current_qs_list = self.target_model.predict(current_states)
 
 		new_states = np.array([transition[3] for transition in minibatch])
 		future_qs = self.target_model.predict(new_states)
-
+		
 		X = []
 		y = []
 
@@ -103,3 +112,12 @@ class DQNAgent():
 			self.target_model.set_weights(self.model.get_weights())
 			self.target_update_counter = 0
 
+	def log(self, *args):
+		if self.log_path == None:
+			return 
+
+		l = [str(arg) for arg in args]
+		prefix = '[DQN]'
+		string = '{} {}'.format(prefix, ' '.join(l))
+		with open(self.log_path, 'a') as fd:
+			fd.write(f'{string}\n')
