@@ -44,7 +44,7 @@ class DQNAgent():
 		self.replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
 
 		self.epsilon = 1 
-		self.epsilon_decay = 0.99975
+		self.epsilon_decay = 0.99
 		self.min_epsilon = 0.001
 
 		self.target_update_counter = 0
@@ -173,13 +173,12 @@ class DQNAgent():
 
 		if terminal_state:
 			self.target_update_counter += 1
+			self.decay_epsilon()
 
 		if self.target_update_counter >= self.update_target_every:
 			self.log('Updating target model')
 			self.target_model.set_weights(self.model.get_weights())
 			self.target_update_counter = 0
-
-			self.decay_epsilon()
 
 	def log(self, *args):
 		if self.log_path == None:
