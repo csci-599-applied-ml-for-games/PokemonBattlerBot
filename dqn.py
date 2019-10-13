@@ -8,8 +8,9 @@ import random
 random.seed()
 import os
 from collections import deque
+from enum import Enum, auto
 
-from GameState import POKEMON_NAME_TO_INDEX, MOVE_NAME_TO_INDEX
+from gamestate import POKEMON_NAME_TO_INDEX, MOVE_NAME_TO_INDEX
 
 import numpy as np
 from keras.models import Sequential
@@ -80,7 +81,8 @@ class DQNAgent():
 	def get_action(self, state, valid_actions):
 		rv = random.choice(valid_actions) + (None,) 
 
-		qs = self.get_qs(np.array([state]))
+		#NOTE: grab zeroth element b/c we only passed in one state
+		qs = self.get_qs(np.array([state]))[0] 
 		
 		#NOTE: sort actions so that our output indices always match the actions 
 		sorted_actions = []
@@ -106,26 +108,30 @@ class DQNAgent():
 		
 		#NOTE: now sort by q values
 		formatted_actions = []
-		for q_index, action_dqn_index, action_index, action_name, action_type \
+		for q_index, (action_dqn_index, action_index, action_name, action_type) \
 			in enumerate(sorted_actions):
 
 			try:
-				formatted_actions.append(q_index, qs[q_index], 
-					(action_index, action_name, action_type))
+				formatted_actions.append((q_index, qs[q_index], 
+					(action_index, action_name, action_type)))
 			except IndexError:
 				self.log(f'ERROR: Bad q_index {q_index}')
-				return rv
+				if len(formatted_actions) > 0:
+					q_index, q_value, action = random.choice(formatted_actions)
+					return action, q_value
+				else:
+					return rv
 
 		#NOTE: As epsilon grows small, we make fewer random choices
-		if self.training and random.random() <= epsilon: 
-			self.log(f'Making random choice (epsilon {epsilon})')
+		if self.training and random.random() <= self.epsilon: 
+			self.log(f'Making random choice (epsilon {self.epsilon})')
 			q_index, q_value, action = random.choice(formatted_actions)
 		else:
-			self.log(f'Making q-valued choice (epsilon {epsilon})')
+			self.log(f'Making q-valued choice (epsilon {self.epsilon})')
 			formatted_actions = sorted(formatted_actions, key=lambda x: x[1])
 			q_index, q_value, action = formatted_actions[-1]
 		
-		return action, q_index
+		return action + (q_index,)
 
 	def train(self, terminal_state):
 		if not self.training:

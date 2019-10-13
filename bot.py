@@ -5,7 +5,6 @@ import json
 import csv
 import time
 from datetime import datetime
-from enum import Enum, auto
 
 import showdown 
 
