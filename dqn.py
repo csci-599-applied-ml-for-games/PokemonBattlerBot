@@ -5,6 +5,7 @@ and
 https://pythonprogramming.net/training-deep-q-learning-dqn-reinforcement-learning-python-tutorial/?completed=/deep-q-learning-dqn-reinforcement-learning-python-tutorial/
 '''
 import random
+random.seed()
 import os
 from collections import deque
 
@@ -111,6 +112,7 @@ class DQNAgent():
 			self.target_update_counter += 1
 
 		if self.target_update_counter >= self.update_target_every:
+			self.log('Updating target model')
 			self.target_model.set_weights(self.model.get_weights())
 			self.target_update_counter = 0
 
