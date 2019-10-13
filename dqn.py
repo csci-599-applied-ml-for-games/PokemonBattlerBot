@@ -72,6 +72,11 @@ class DQNAgent():
 		#NOTE: let gamestate class handle normalization
 		return self.model.predict(state)
 
+	def decay_epsilon(self):
+		if self.epsilon > self.min_epsilon:
+			self.epsilon *= self.epsilon_decay
+			self.epsilon = max(self.min_epsilon, self.epsilon)
+
 	def get_action(self, state, valid_actions):
 		rv = random.choice(valid_actions) + (None,) 
 
@@ -113,8 +118,10 @@ class DQNAgent():
 
 		#NOTE: As epsilon grows small, we make fewer random choices
 		if self.training and random.random() <= epsilon: 
+			self.log(f'Making random choice (epsilon {epsilon})')
 			q_index, q_value, action = random.choice(formatted_actions)
 		else:
+			self.log(f'Making q-valued choice (epsilon {epsilon})')
 			formatted_actions = sorted(formatted_actions, key=lambda x: x[1])
 			q_index, q_value, action = formatted_actions[-1]
 		
@@ -171,6 +178,8 @@ class DQNAgent():
 			self.log('Updating target model')
 			self.target_model.set_weights(self.model.get_weights())
 			self.target_update_counter = 0
+
+			self.decay_epsilon()
 
 	def log(self, *args):
 		if self.log_path == None:
