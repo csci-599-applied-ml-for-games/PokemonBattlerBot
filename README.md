@@ -2,7 +2,7 @@
 Package runs with Python3 
 
 # Required Packages
-Install requests, websockets, and aiohttp. Sample command
+Install requests, docopt, websockets, and aiohttp. Sample command
 
 pip3 install --user requests 
 

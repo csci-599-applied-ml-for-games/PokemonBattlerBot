@@ -1,3 +1,17 @@
+'''
+Usage:
+	bot.py <username> <password> <expected_opponent> [--iterations=1] [--challenge] [--modeltype=<modeltype>]
+
+Arguments:
+	<username> 			Username for the client
+	<password>			Password for the account <username>
+	<expected_opponent> The account name for the expected opponent
+	<modeltype>			The type of model to use for the test
+Options:
+	--iterations 		The number of iterations to play against the opponent
+	--challenge 		Challenge the expected_opponent when not playing a game
+'''
+
 import sys
 import os
 import random 
@@ -5,6 +19,8 @@ import json
 import csv
 import time
 from datetime import datetime
+
+from docopt import docopt 
 
 import showdown 
 
@@ -554,16 +570,15 @@ class BotClient(showdown.Client):
 			self.weather = 'none'
 
 def main():
-	if len(sys.argv) != 5 and len(sys.argv) != 6:
-		print('Usage: python bot.py <iterations> <username> <password> <expected_opponent> '
-			'[--challenge]')
-		return 
+	args = docopt(__doc__) 
+	print(args)
 
-	iterations = int(sys.argv[1])
-	username = sys.argv[2]
-	password = sys.argv[3]
-	expected_opponent = sys.argv[4]
-	challenge = len(sys.argv) == 6
+	username = args['<username>']
+	password = args['<password>']
+	expected_opponent = args['<expected_opponent>']
+	iterations = args['--iterations'] if args['--iterations'] != None else 1 
+	challenge = args['--challenge']
+	model_type = args['--modeltype'] if args['--modeltype'] != None else 'dqn'
 
 	with open(os.path.join(BOT_DIR, 'teams/PokemonTeam'), 'rt') as teamfd:
 		team = teamfd.read()
@@ -580,7 +595,6 @@ def main():
 			if type2 != '':
 				TYPE_MAP[name].append(type2)
 
-	model_type = 'dqn' #TODO: move out to command line argument
 	if model_type == 'dqn':
 		input_shape = (GameState.vector_dimension(),)
 		BotClient(name=username, password=password, 
