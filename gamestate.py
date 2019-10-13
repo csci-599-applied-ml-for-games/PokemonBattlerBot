@@ -97,9 +97,12 @@ class GameState():
 
 	num_player_elements = max_team_size * ATTRIBUTES_PER_POKEMON
 
+	@staticmethod
+	def vector_dimension():
+		return GameState.Player.count * GameState.num_player_elements
+
 	def __init__(self):
-		self.vector_list = [0.0 for _ in range(GameState.Player.count * 
-			GameState.num_player_elements)]
+		self.vector_list = [0.0 for _ in range(GameState.vector_dimension())]
 
 		#NOTE: for easy access to pokemon team position in the future
 		self.name_to_position = [{}, {}] 

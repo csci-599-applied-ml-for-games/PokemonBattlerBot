@@ -10,6 +10,7 @@ from enum import Enum, auto
 import showdown 
 
 from gamestate import GameState
+from dqn import DQNAgent
 
 BOT_DIR = os.path.dirname(__file__)
 TYPE_MAP = {}
@@ -18,13 +19,9 @@ class ActionType(Enum):
 	Move = auto()
 	Switch = auto()
 
-class ModelType(Enum):
-	Random = auto()
-	DQN = auto()
-
 class RandomModel():
 	def __init__(self):
-		self.type = ModelType.Random
+		pass
 
 	def get_action(self, state, valid_actions):
 		#NOTE: Adding the None tuple is for compatibility with DQN 
@@ -114,11 +111,11 @@ class BotClient(showdown.Client):
 				valid_actions.append((pokemon_index + 1 , 
 					pokemon_name, 
 					ActionType.Switch))
-				
+		
 		self.log(f'valid_actions: {valid_actions}')
 
 		action_index, action_string, action_type, self.action = \
-			self.model.get_action(self.state_vl, valid_actions)
+			self.model.get_action(self.gs.vector_list, valid_actions)
 
 		if action_type == ActionType.Move:
 			await room_obj.move(action_index) 
@@ -232,16 +229,20 @@ class BotClient(showdown.Client):
 					#NOTE: this should be changed if using other reward functions besides win or lose the game
 					reward = 0
 					
-					last_state = [element for element in self.gs.vector_list]
+					last_state = [element for element in self.state_vl]
 					self.state_vl = self.gs.vector_list
 					done = False
 
-					self.model.update_replay_memory((last_state, 
+					transition = (last_state, 
 						self.action, 
 						reward, 
 						self.state_vl, 
-						done))
+						done)
+					self.log(f'Updating replay memory with {transition}')
+					self.model.update_replay_memory(transition)
+					self.log(f'Successfully updated replay memory')
 					self.model.train(False)
+					self.log(f'Trained')
 
 			elif inp_type == 'request':
 				json_string = params[0]
@@ -424,11 +425,32 @@ class BotClient(showdown.Client):
 						await self.take_action(room_obj, self.last_request_data)
 
 			elif inp_type == 'win':
+				done = True
+
 				winner = params[0]
 				if winner == self.name:
 					self.log("We won")
+					reward = 10000 #NOTE: Reward is chosen somewhat arbitrarily
 				else:
 					self.log("We lost")
+					reward = -10000
+
+				last_state = [element for element in self.state_vl]
+				self.state_vl = self.gs.vector_list
+				
+				transition = (last_state, 
+					self.action, 
+					reward, 
+					self.state_vl, 
+					done)
+				self.log(f'Updating replay memory with {transition}')
+				self.model.update_replay_memory(transition)
+				self.log(f'Successfully updated replay memory')
+				self.model.train(True)
+				self.log(f'Trained')
+				#TODO: save model so other client can keep improving...?
+				#TODO: or can they just both improve?
+					
 				await room_obj.leave()
 				self.iterations_run += 1
 				
@@ -553,10 +575,19 @@ def main():
 			if type2 != '':
 				TYPE_MAP[name].append(type2)
 
-
-	BotClient(name=username, password=password, 
-		expected_opponent=expected_opponent, team=team, 
-		challenge=challenge, iterations=iterations, model=None).start()
+	model_type = 'dqn' #TODO: move out to command line argument
+	if model_type == 'dqn':
+		input_shape = (GameState.vector_dimension(),)
+		BotClient(name=username, password=password, 
+			expected_opponent=expected_opponent, team=team, 
+			challenge=challenge, iterations=iterations, 
+			model=DQNAgent(input_shape)).start()
+	elif model_type == 'random':
+		input_shape = (GameState.vector_dimension(),)
+		BotClient(name=username, password=password, 
+			expected_opponent=expected_opponent, team=team, 
+			challenge=challenge, iterations=iterations, 
+			model=None).start()
 
 if __name__ == '__main__':
 	random.seed()

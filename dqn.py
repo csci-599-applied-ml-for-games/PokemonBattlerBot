@@ -4,10 +4,15 @@ https://pythonprogramming.net/deep-q-learning-dqn-reinforcement-learning-python-
 and 
 https://pythonprogramming.net/training-deep-q-learning-dqn-reinforcement-learning-python-tutorial/?completed=/deep-q-learning-dqn-reinforcement-learning-python-tutorial/
 '''
+import random
 import os
+from collections import deque
 
+import numpy as np
 from keras.models import Sequential
 from keras.layers import Dense
+from keras.optimizers import Adam
+
 LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
 
 DISCOUNT = 0.99
@@ -19,7 +24,9 @@ MINIBATCH_SIZE = 64
 #TODO: handle mega
 MAX_ACTION_SPACE_SIZE = 9
 class DQNAgent():
-	def __init__(self, type):
+	def __init__(self, input_shape):
+		self.input_shape = input_shape
+
 		self.model = self.create_model()
 
 		self.target_model = self.create_model()
@@ -37,10 +44,11 @@ class DQNAgent():
 	def create_model(self):
 		model = Sequential()
 
-		model.add(Dense(64))
-		model.add(Dense(MAX_ACTION_SPACE_SIZE, activation='relu'))
-
-		model.compile()
+		#NOTE: the current unit count (64) is chosen somewhat arbitrarily
+		model.add(Dense(64, input_shape=self.input_shape)) 
+		model.add(Dense(MAX_ACTION_SPACE_SIZE, activation='linear'))
+		model.compile(loss='mse', optimizer=Adam(lr=0.001), 
+			metrics=['accuracy'])
 		return model
 
 	def update_replay_memory(self, transition):
@@ -50,7 +58,10 @@ class DQNAgent():
 		#NOTE: let gamestate class handle normalization
 		return self.model.predict(state)
 
-	def get_action(self, state, actions):
+	def get_action(self, state, valid_actions):
+		qs = self.get_qs(np.array([state])) 
+		rv = random.choice(valid_actions) + (None,) #TODO: replace me!
+		return rv
 
 	def train(self, terminal_state):
 		if len(self.replay_memory) < MIN_REPLAY_SIZE:
