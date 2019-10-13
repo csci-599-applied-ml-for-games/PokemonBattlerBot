@@ -462,6 +462,7 @@ class BotClient(showdown.Client):
 					
 				await room_obj.leave()
 				self.iterations_run += 1
+				self.update_log_paths()
 				
 				if self.iterations_run < self.iterations:
 					self.log("Starting iteration {}".format(self.iterations_run))
