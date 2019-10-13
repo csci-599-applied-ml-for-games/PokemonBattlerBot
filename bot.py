@@ -571,7 +571,6 @@ class BotClient(showdown.Client):
 
 def main():
 	args = docopt(__doc__) 
-	print(args)
 
 	username = args['<username>']
 	password = args['<password>']
