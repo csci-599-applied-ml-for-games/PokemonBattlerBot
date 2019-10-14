@@ -134,7 +134,8 @@ class DQNAgent():
 			self.log(f'Making q-valued choice (epsilon {self.epsilon})')
 			formatted_actions = sorted(formatted_actions, key=lambda x: x[1])
 			q_index, q_value, action = formatted_actions[-1]
-		
+		self.log(f'Actions available were {formatted_actions}')
+		self.log(f'Choice was {action}')
 		return action + (q_index,)
 
 	def train(self, terminal_state):
