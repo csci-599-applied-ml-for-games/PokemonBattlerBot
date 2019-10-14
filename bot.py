@@ -1,12 +1,13 @@
 '''
 Usage:
-	bot.py <username> <password> <expected_opponent> [--iterations=1] [--challenge] [--modeltype=<modeltype>]
+	bot.py <username> <password> <expected_opponent> [--iterations=1] [--challenge] [--modeltype=<modeltype>] [--epsilondecay=<epsilondecay>]
 
 Arguments:
 	<username> 			Username for the client
 	<password>			Password for the account <username>
 	<expected_opponent> The account name for the expected opponent
 	<modeltype>			The type of model to use for the test
+	<epsilondecay>		The decay rate for epsilon 
 Options:
 	--iterations 		The number of iterations to play against the opponent
 	--challenge 		Challenge the expected_opponent when not playing a game
@@ -63,9 +64,9 @@ class BotClient(showdown.Client):
 		self.iterations = iterations 
 
 		if model == None:
-			self.model = RandomModel()
+			self.agent = RandomModel()
 		else:
-			self.model = model
+			self.agent = model
 		self.state_vl = None
 		self.action = None
 
@@ -85,10 +86,12 @@ class BotClient(showdown.Client):
 	def update_log_paths(self):
 		self.log_file = os.path.join(self.logs_dir, 
 			f'{self.datestring}_Iteration{self.iterations_run}.txt')
-		self.model.log_path = self.log_file
-		self.model.replay_memory_path = os.path.join(self.logs_dir, 
+		self.agent.log_path = self.log_file
+		self.agent.replay_memory_path = os.path.join(self.logs_dir, 
 			f'{self.datestring}_Iteration{self.iterations_run}_'
 			'replaymemory.txt')
+		self.agent.model_path = os.path.join(self.logs_dir, 
+			f'{self.datestring}_Iteration{self.iterations_run}.model')
 
 	def log(self, *args):
 		l = [str(arg) for arg in args]
@@ -135,7 +138,7 @@ class BotClient(showdown.Client):
 		self.log(f'valid_actions: {valid_actions}')
 
 		action_index, action_string, action_type, self.action = \
-			self.model.get_action(self.gs.vector_list, valid_actions)
+			self.agent.get_action(self.gs.vector_list, valid_actions)
 
 		if action_type == ActionType.Move:
 			await room_obj.move(action_index) 
@@ -259,9 +262,9 @@ class BotClient(showdown.Client):
 						self.state_vl, 
 						done)
 					self.log(f'Updating replay memory with {transition}')
-					self.model.update_replay_memory(transition)
+					self.agent.update_replay_memory(transition)
 					self.log(f'Successfully updated replay memory')
-					self.model.train(False)
+					self.agent.train(False)
 					self.log(f'Trained')
 
 			elif inp_type == 'request':
@@ -464,12 +467,14 @@ class BotClient(showdown.Client):
 					self.state_vl, 
 					done)
 				self.log(f'Updating replay memory with {transition}')
-				self.model.update_replay_memory(transition)
+				self.agent.update_replay_memory(transition)
 				self.log(f'Successfully updated replay memory')
-				self.model.train(True)
-				self.log(f'Trained')
-				#TODO: save model so other client can keep improving...?
-				#TODO: or can they just both improve?
+				trained = self.agent.train(True)
+				if trained:
+					self.log(f'Trained')
+					self.agent.save_model()
+				else:
+					self.log(f'Not trained')
 					
 				await room_obj.leave()
 				self.iterations_run += 1
@@ -579,6 +584,9 @@ def main():
 		else 1) 
 	challenge = args['--challenge']
 	model_type = args['--modeltype'] if args['--modeltype'] != None else 'dqn'
+	epsilon_decay = (float(args['--epsilondecay']) 
+		if args['--epsilondecay'] != None 
+		else 0.99)
 
 	with open(os.path.join(BOT_DIR, 'teams/PokemonTeam'), 'rt') as teamfd:
 		team = teamfd.read()
@@ -600,7 +608,7 @@ def main():
 		BotClient(name=username, password=password, 
 			expected_opponent=expected_opponent, team=team, 
 			challenge=challenge, iterations=iterations, 
-			model=DQNAgent(input_shape)).start()
+			model=DQNAgent(input_shape, epsilon_decay=epsilon_decay)).start()
 	elif model_type == 'random':
 		input_shape = (GameState.vector_dimension(),)
 		BotClient(name=username, password=password, 

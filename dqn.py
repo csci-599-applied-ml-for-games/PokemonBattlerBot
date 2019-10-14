@@ -13,7 +13,7 @@ from enum import Enum, auto
 from gamestate import POKEMON_NAME_TO_INDEX, MOVE_NAME_TO_INDEX
 
 import numpy as np
-from keras.models import Sequential
+from keras.models import Sequential, load_model
 from keras.layers import Dense
 from keras.optimizers import Adam
 
@@ -33,7 +33,7 @@ class ActionType(Enum):
 MAX_ACTION_SPACE_SIZE = 9
 class DQNAgent():
 	def __init__(self, input_shape, log_path=None, replay_memory_path=None, 
-		training=True):
+		model_path=None, training=True, epsilon_decay=0.99):
 
 		self.input_shape = input_shape
 
@@ -45,7 +45,7 @@ class DQNAgent():
 		self.replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
 
 		self.epsilon = 1 
-		self.epsilon_decay = 0.99
+		self.epsilon_decay = epsilon_decay
 		self.min_epsilon = 0.001
 
 		self.target_update_counter = 0
@@ -53,6 +53,7 @@ class DQNAgent():
 
 		self.log_path = log_path
 		self.replay_memory_path = replay_memory_path
+		self.model_path = model_path
 
 		self.training = training
 
@@ -138,7 +139,7 @@ class DQNAgent():
 
 	def train(self, terminal_state):
 		if not self.training:
-			return
+			return False
 
 		self.log('Saving replay_memory')
 		if self.replay_memory_path:
@@ -149,7 +150,7 @@ class DQNAgent():
 		if len(self.replay_memory) < MIN_REPLAY_MEMORY_SIZE:
 			self.log(f'Not enough transitions to train. '
 				f'Only {len(self.replay_memory)} transitions')
-			return
+			return False
 
 		minibatch = random.sample(self.replay_memory, MINIBATCH_SIZE)
 
@@ -188,6 +189,16 @@ class DQNAgent():
 			self.log('Updating target model')
 			self.target_model.set_weights(self.model.get_weights())
 			self.target_update_counter = 0
+
+		return True
+
+	def save_model(self, path=None):
+		if path == None:
+			path = self.model_path
+		self.model.save(path)
+
+	def load_model(self, path):
+		self.model = load_model(path)
 
 	def log(self, *args):
 		if self.log_path == None:
