@@ -1,6 +1,6 @@
 '''
 Usage:
-	bot.py <username> <password> <expected_opponent> [--iterations=1] [--challenge] [--modeltype=<modeltype>] [--epsilondecay=<epsilondecay>]
+	bot.py <username> <password> <expected_opponent> [--iterations=1] [--challenge] [--modeltype=<modeltype>] [--load_model=<model_path>] [--epsilondecay=<epsilondecay>] [--notraining] 
 
 Arguments:
 	<username> 			Username for the client
@@ -8,9 +8,11 @@ Arguments:
 	<expected_opponent> The account name for the expected opponent
 	<modeltype>			The type of model to use for the test
 	<epsilondecay>		The decay rate for epsilon 
+	<model_path> 		Path to a model to load into DQN agent 
 Options:
 	--iterations 		The number of iterations to play against the opponent
 	--challenge 		Challenge the expected_opponent when not playing a game
+	--notraining		Just run with the model. No training
 '''
 
 import sys
@@ -49,7 +51,7 @@ class RandomModel():
 class BotClient(showdown.Client):
 	def __init__(self, name='', password='', loop=None, max_room_logs=5000,
 		server_id='showdown', server_host=None, expected_opponent=None,
-		team=None, challenge=False, iterations=1, model=None):
+		team=None, challenge=False, iterations=1, agent=None):
 
 		if expected_opponent == None:
 			raise Exception("No expected opponent found in arguments")
@@ -63,10 +65,10 @@ class BotClient(showdown.Client):
 		self.iterations_run = 0
 		self.iterations = iterations 
 
-		if model == None:
+		if agent == None:
 			self.agent = RandomModel()
 		else:
-			self.agent = model
+			self.agent = agent
 		self.state_vl = None
 		self.action = None
 
@@ -587,6 +589,8 @@ def main():
 	epsilon_decay = (float(args['--epsilondecay']) 
 		if args['--epsilondecay'] != None 
 		else 0.99)
+	is_training = not args['--notraining'] 
+	load_model_path = args.get('--load_model')
 
 	with open(os.path.join(BOT_DIR, 'teams/PokemonTeam'), 'rt') as teamfd:
 		team = teamfd.read()
@@ -605,16 +609,22 @@ def main():
 
 	if model_type == 'dqn':
 		input_shape = (GameState.vector_dimension(),)
+		
+		agent = DQNAgent(input_shape, epsilon_decay=epsilon_decay, 
+			training=is_training)
+		if load_model_path:
+			agent.load_model(load_model_path)
+
 		BotClient(name=username, password=password, 
 			expected_opponent=expected_opponent, team=team, 
 			challenge=challenge, iterations=iterations, 
-			model=DQNAgent(input_shape, epsilon_decay=epsilon_decay)).start()
+			agent=agent).start()
 	elif model_type == 'random':
 		input_shape = (GameState.vector_dimension(),)
 		BotClient(name=username, password=password, 
 			expected_opponent=expected_opponent, team=team, 
 			challenge=challenge, iterations=iterations, 
-			model=None).start()
+			agent=None).start()
 
 if __name__ == '__main__':
 	random.seed()
