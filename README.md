@@ -15,6 +15,12 @@ the following command
 I believe you have to make an account before you start testing with the bot. I 
 recommend making the accounts in a way that the user name matches the password. 
 
+# Models
+The models directory is for storing models for future use only. Don't commit
+short-term models here.
+
 # Current Accounts
 USCBot1
 USCBot2
+USCBot9
+USCBot10
