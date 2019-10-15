@@ -1,6 +1,6 @@
 '''
 Usage:
-	bot.py <username> <password> <expected_opponent> [--iterations=1] [--challenge] [--modeltype=<modeltype>] [--load_model=<model_path>] [--epsilondecay=<epsilondecay>] [--notraining] 
+	bot.py <username> <password> <expected_opponent> [--iterations=1] [--challenge] [--modeltype=<modeltype>] [--load_model=<model_path>] [--epsilondecay=<epsilondecay>] [--notraining] [--printstats]
 
 Arguments:
 	<username> 			Username for the client
@@ -13,6 +13,7 @@ Options:
 	--iterations 		The number of iterations to play against the opponent
 	--challenge 		Challenge the expected_opponent when not playing a game
 	--notraining		Just run with the model. No training
+	--printstats 		Prints the win/loss rate of this process 
 '''
 
 import sys
@@ -51,7 +52,8 @@ class RandomModel():
 class BotClient(showdown.Client):
 	def __init__(self, name='', password='', loop=None, max_room_logs=5000,
 		server_id='showdown', server_host=None, expected_opponent=None,
-		team=None, challenge=False, iterations=1, agent=None):
+		team=None, challenge=False, iterations=1, agent=None, 
+		print_stats=False):
 
 		if expected_opponent == None:
 			raise Exception("No expected opponent found in arguments")
@@ -80,6 +82,10 @@ class BotClient(showdown.Client):
 
 		self.challenge = challenge
 		self.has_challenged = False
+
+		self.wins = 0
+		self.losses = 0
+		self.print_stats = print_stats
 
 		super().__init__(name=name, password=password, loop=loop, 
 			max_room_logs=max_room_logs, server_id=server_id, 
@@ -454,9 +460,11 @@ class BotClient(showdown.Client):
 
 				winner = params[0]
 				if winner == self.name:
+					self.wins += 1
 					self.log("We won")
 					reward = 10000 #NOTE: Reward is chosen somewhat arbitrarily
 				else:
+					self.losses += 1
 					self.log("We lost")
 					reward = -10000
 
@@ -488,6 +496,10 @@ class BotClient(showdown.Client):
 						time.sleep(5)
 						await self.challenge_expected()
 				else:
+					if self.print_stats:
+						win_ratio = (float(self.wins) / 
+							float(self.wins + self.losses))
+						print(f'Win ratio: {win_ratio}')
 					sys.exit(0)
 
 			elif inp_type == '-ability':
@@ -591,6 +603,7 @@ def main():
 		else 0.99)
 	is_training = not args['--notraining'] 
 	load_model_path = args.get('--load_model')
+	print_stats = args.get('--printstats')
 
 	with open(os.path.join(BOT_DIR, 'teams/PokemonTeam'), 'rt') as teamfd:
 		team = teamfd.read()
@@ -609,7 +622,7 @@ def main():
 
 	if model_type == 'dqn':
 		input_shape = (GameState.vector_dimension(),)
-		
+
 		agent = DQNAgent(input_shape, epsilon_decay=epsilon_decay, 
 			training=is_training)
 		if load_model_path:
@@ -618,13 +631,13 @@ def main():
 		BotClient(name=username, password=password, 
 			expected_opponent=expected_opponent, team=team, 
 			challenge=challenge, iterations=iterations, 
-			agent=agent).start()
+			agent=agent, print_stats=print_stats).start()
 	elif model_type == 'random':
 		input_shape = (GameState.vector_dimension(),)
 		BotClient(name=username, password=password, 
 			expected_opponent=expected_opponent, team=team, 
 			challenge=challenge, iterations=iterations, 
-			agent=None).start()
+			agent=None, print_stats=print_stats).start()
 
 if __name__ == '__main__':
 	random.seed()
