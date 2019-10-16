@@ -1,6 +1,6 @@
 '''
 Usage:
-	bot.py <username> <password> <expected_opponent> [--iterations=1] [--challenge] [--modeltype=<modeltype>] [--load_model=<model_path>] [--epsilondecay=<epsilondecay>] [--notraining] [--printstats]
+	bot.py <username> <password> <expected_opponent> [--iterations=<iterations>] [--challenge] [--modeltype=<modeltype>] [--load_model=<model_path>] [--epsilondecay=<epsilondecay>] [--notraining] [--printstats]
 
 Arguments:
 	<username> 			Username for the client
@@ -126,9 +126,10 @@ class BotClient(showdown.Client):
 		self.log(f'Moves: {moves}')
 		valid_actions = []
 		for move_index, move_data in enumerate(moves):
-			valid_actions.append((move_index + 1, 
-				move_data['move'], 
-				ActionType.Move))
+			if move_data.get('pp', 0) > 0:
+				valid_actions.append((move_index + 1, 
+					move_data['move'], 
+					ActionType.Move))
 		move_count = len(moves)
 
 		team_info = self.get_team_info(data)
