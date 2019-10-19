@@ -4,6 +4,7 @@ import random
 import json 
 import csv
 import time
+import util
 from datetime import datetime
 
 import showdown 
@@ -46,6 +47,17 @@ class BotClient(showdown.Client):
 		log_file = f'{self.datestring}_Iteration{self.iterations_run}.txt'
 		with open(os.path.join(logs_dir, log_file), 'a') as fd:
 			fd.write(f'{string}\n')
+
+	def save_replay(self, room_obj):
+		replays_dir = os.path.join(BOT_DIR, 'replays')
+		if not os.path.exists(replays_dir):
+			os.mkdir(replays_dir)
+		
+		replay_file = f'{self.datestring}_Iteration{self.iterations_run}.html'
+		with open(os.path.join(replays_dir, replay_file), 'wt') as f:
+			f.write(util.get_replay_header())
+			f.write('\n'.join(room_obj.logs))
+			f.write(util.get_replay_footer())
 	
 	@staticmethod
 	def get_team_info(data):
@@ -318,6 +330,7 @@ class BotClient(showdown.Client):
 				self.log('Opp sidestart', self.opp_sidestart)
 
 			elif inp_type == 'error':
+				self.save_replay(room_obj)
 				if params[0].startswith('[Invalid choice]'):
 					if ("Can't switch: You can't switch to an active Pokémon" 
 						in params[0]):
@@ -327,6 +340,7 @@ class BotClient(showdown.Client):
 						await self.action(room_obj, self.last_request_data)
 
 			elif inp_type == 'win':
+				self.save_replay(room_obj)
 				winner = params[0]
 				if winner == self.name:
 					self.log("We won")
