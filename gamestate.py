@@ -77,6 +77,39 @@ TYPE_NAME_TO_INDEX = {
 }
 _, INDEX_TO_TYPE_NAME = attribute_dict_setup(TYPE_NAME_TO_INDEX)
 
+STATUS_NAME_TO_INDEX = {
+	'brn': increment_index(),
+	'par': increment_index(),
+	'slp': increment_index(),
+	'frz': increment_index(),
+	'psn': increment_index(),
+	'tox': increment_index(),
+	'confusion': increment_index(),
+	'flinch': increment_index(),
+	'trapped': increment_index(),
+	'trapper': increment_index(),
+	'partiallytrapped': increment_index(),
+	'lockedmove': increment_index(),
+	'twoturnmove': increment_index(),
+	'choicelock': increment_index(),
+	'mustrecharge': increment_index(),
+	'futuremove': increment_index(),
+	'healreplacement': increment_index(),
+	'stall': increment_index(),
+	'gem': increment_index(),
+	'raindance': increment_index(),
+	'primordialsea': increment_index(),
+	'sunnyday': increment_index(),
+	'desolateland': increment_index(),
+	'sandstorm': increment_index(),
+	'hail': increment_index(),
+	'deltastream': increment_index(),
+	'arceus': increment_index(),
+	'silvally': increment_index(),
+	'NotFound': increment_index(),
+}
+_, INDEX_TO_STATUS_NAME = attribute_dict_setup(STATUS_NAME_TO_INDEX)
+
 ACTIVE_STATE = increment_index()
 
 FAINTED_STATE = increment_index()
@@ -256,6 +289,32 @@ class GameState():
 				types.append(INDEX_TO_TYPE_NAME[type_index - 
 					start_of_type_indices])
 		return types
+	
+	def _set_status(self, player, team_position, status_position, value):
+		self.vector_list[player * GameState.num_player_elements + 
+			team_position * ATTRIBUTES_PER_POKEMON + status_position] = value
+
+	def set_status(self, player, name, status_name):
+		team_position = self.name_to_position[player][name]
+		type_position = STATUS_NAME_TO_INDEX.get(status_name, STATUS_NAME_TO_INDEX['NotFound'])
+		self._set_status(player, team_position, type_position, 1.0)
+
+	def check_status(self, player, name):
+		name = GameState.pokemon_name_clean(name)
+		statuses = []
+		position = self.name_to_position[player][name]
+		start_checking = (player * GameState.num_player_elements +
+			position * ATTRIBUTES_PER_POKEMON + STATUS_NAME_TO_INDEX['Min'])
+		end_checking = start_checking + STATUS_NAME_TO_INDEX['Count']
+		
+		start_of_status_indices = (player * GameState.num_player_elements +
+			position * ATTRIBUTES_PER_POKEMON)
+		
+		for status_index in range(start_checking, end_checking):
+			if self.vector_list[status_index] == 1.0:
+				statuses.append(INDEX_TO_STATUS_NAME[status_index - 
+					start_of_status_indices])
+		return statuses
 
 	def update_abilities(self, player, pokemon, ability):
 		#TODO: replace implementation with packing into vector list
@@ -274,8 +333,6 @@ class GameState():
 		self.team_zpower[player][pokemon_name] = True
 
 	#set weather state
-
-	#set status
 
 
 if __name__ == '__main__':
@@ -389,6 +446,16 @@ if __name__ == '__main__':
 			gs.set_type(player, pokemon, type_name)
 		check_types(player, pokemon, type_names)
 	
+	def check_statuses(player, pokemon, status_names):
+		has_types = gs.check_status(player, pokemon)
+		if set(has_types) != set(status_names):
+			print(f'{pokemon} has types {has_types} instead of {status_names}')
+
+	def test_statuses(player, pokemon, status_names):
+		for status_name in status_names:
+			gs.set_status(player, pokemon, status_name)
+		check_statuses(player, pokemon, status_names)
+
 	for player in GameState.Player:
 		if player == GameState.Player.count:
 			continue
@@ -403,4 +470,4 @@ if __name__ == '__main__':
 		for pokemon, type_names in pokemon_types:
 			test_types(player, pokemon, type_names)
 		for pokemon, type_names in pokemon_types:
-			check_types(player, pokemon, type_names)
+			check_types(player, pokemon, type_names)	
