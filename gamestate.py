@@ -298,6 +298,11 @@ class GameState():
 		team_position = self.name_to_position[player][name]
 		type_position = STATUS_NAME_TO_INDEX.get(status_name, STATUS_NAME_TO_INDEX['NotFound'])
 		self._set_status(player, team_position, type_position, 1.0)
+	
+	def remove_status(self, player, name, status_name):
+		team_position = self.name_to_position[player][name]
+		type_position = STATUS_NAME_TO_INDEX.get(status_name, STATUS_NAME_TO_INDEX['NotFound'])
+		self._set_status(player, team_position, type_position, 0.0)
 
 	def check_status(self, player, name):
 		name = GameState.pokemon_name_clean(name)
