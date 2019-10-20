@@ -1,6 +1,6 @@
 '''
 Usage:
-	bot.py <username> <password> <expected_opponent> [--iterations=<iterations>] [--challenge] [--modeltype=<modeltype>] [--load_model=<model_path>] [--epsilondecay=<epsilondecay>] [--notraining] [--printstats]
+	bot.py <username> <password> <expected_opponent> [--forever|--iterations=<iterations>|--epochs=<epochs>] [--challenge] [--modeltype=<modeltype>] [--load_model=<model_path>] [--epsilondecay=<epsilondecay>] [--notraining] [--printstats]
 
 Arguments:
 	<username> 			Username for the client
@@ -10,7 +10,9 @@ Arguments:
 	<epsilondecay>		The decay rate for epsilon 
 	<model_path> 		Path to a model to load into DQN agent 
 Options:
-	--iterations 		The number of iterations to play against the opponent
+	--epochs			The number of epochs to train for 
+	--iterations 		The number of iterations to play against the opponent. 
+	--forever			Run until someone kills the process 
 	--challenge 		Challenge the expected_opponent when not playing a game
 	--notraining		Just run with the model. No training
 	--printstats 		Prints the win/loss rate of this process 
@@ -23,6 +25,7 @@ import json
 import csv
 import time
 from datetime import datetime
+from enum import Enum, auto
 
 from docopt import docopt 
 
@@ -49,11 +52,16 @@ class RandomModel():
 	def train(*args, **kwargs):
 		pass
 
+class RunType(Enum):
+	Iterations = auto()
+	Epochs = auto()
+	Forever = auto()
+
 class BotClient(showdown.Client):
 	def __init__(self, name='', password='', loop=None, max_room_logs=5000,
 		server_id='showdown', server_host=None, expected_opponent=None,
-		team=None, challenge=False, iterations=1, agent=None, 
-		print_stats=False):
+		team=None, challenge=False, runType=RunType.Iterations, runTypeData=1,
+		agent=None, print_stats=False):
 
 		if expected_opponent == None:
 			raise Exception("No expected opponent found in arguments")
@@ -65,7 +73,12 @@ class BotClient(showdown.Client):
 			self.team_text = team
 
 		self.iterations_run = 0
-		self.iterations = iterations 
+
+		self.runType = runType 
+		if self.runType == RunType.Iterations:
+			self.iterations = runTypeData 
+		elif self.runType == RunType.Epochs:
+			self.epochs = runTypeData
 
 		if agent == None:
 			self.agent = RandomModel()
@@ -106,6 +119,17 @@ class BotClient(showdown.Client):
 		string = ' '.join(l)
 		with open(self.log_file, 'a') as fd:
 			fd.write(f'{string}\n')
+
+	def should_play_new_game(self):
+		if self.runType == RunType.Iterations:
+			return self.iterations_run < self.iterations
+		elif self.runType == RunType.Epochs:
+			return self.agent.current_epoch < self.epochs
+		elif self.runType == RunType.Forever:
+			return True
+		else:
+			self.log(f'Unexpected run type {self.runType}')
+			raise Exception('Unexpected run type')
 	
 	@staticmethod
 	def get_team_info(data):
@@ -498,7 +522,7 @@ class BotClient(showdown.Client):
 				self.iterations_run += 1
 				self.update_log_paths()
 				
-				if self.iterations_run < self.iterations:
+				if self.should_play_new_game():
 					self.log("Starting iteration {}".format(self.iterations_run))
 					if self.challenge:
 						time.sleep(5)
@@ -611,8 +635,26 @@ def main():
 	username = args['<username>']
 	password = args['<password>']
 	expected_opponent = args['<expected_opponent>']
-	iterations = (int(args['--iterations']) if args['--iterations'] != None 
-		else 1) 
+	
+	forever = args['--forever']
+	if not forever:
+		iterations = (int(args['--iterations']) if args['--iterations'] != None 
+			else None)
+		if not iterations:
+			epochs = (int(args['--epochs']) if args['--epochs'] != None 
+				else None)
+			runType = RunType.Epochs
+			runTypeData = epochs
+		else:
+			runType = RunType.Iterations
+			runTypeData = iterations
+			epochs = None
+	else:
+		runType = RunType.Forever
+		runTypeData = None
+		iterations = None
+		epochs = None
+
 	challenge = args['--challenge']
 	model_type = args['--modeltype'] if args['--modeltype'] != None else 'dqn'
 	epsilon_decay = (float(args['--epsilondecay']) 
@@ -645,16 +687,17 @@ def main():
 		if load_model_path:
 			agent.load_model(load_model_path)
 
+
 		BotClient(name=username, password=password, 
 			expected_opponent=expected_opponent, team=team, 
-			challenge=challenge, iterations=iterations, 
+			challenge=challenge, runType=runType, runTypeData=runTypeData, 
 			agent=agent, print_stats=print_stats).start()
 	elif model_type == 'random':
 		input_shape = (GameState.vector_dimension(),)
 		BotClient(name=username, password=password, 
 			expected_opponent=expected_opponent, team=team, 
-			challenge=challenge, iterations=iterations, 
-			agent=None, print_stats=print_stats).start()
+			challenge=challenge, runType=RunType.Iterations, 
+			runTypeData=iterations, agent=None, print_stats=print_stats).start()
 
 if __name__ == '__main__':
 	random.seed()
