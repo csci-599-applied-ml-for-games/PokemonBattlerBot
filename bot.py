@@ -351,8 +351,11 @@ class BotClient(showdown.Client):
 				status = params[1]
 				if self.own_pokemon(pokemon_data):
 					self.add_status(self.statuses, pokemon_name, status)
+					self.gs.set_status(GameState.Player.one, pokemon_name, status)
+
 				else:
 					self.add_status(self.opp_statuses, pokemon_name, status)
+					self.gs.set_status(GameState.Player.two, pokemon_name, status)
 
 			elif inp_type == '-start':
 				pokemon_data = params[0]
@@ -360,8 +363,11 @@ class BotClient(showdown.Client):
 				status = params[1]
 				if self.own_pokemon(pokemon_data):
 					self.add_status(self.statuses, pokemon_name, status)
+					self.gs.set_status(GameState.Player.one, pokemon_name, status)
+
 				else:
 					self.add_status(self.opp_statuses, pokemon_name, status)
+					self.gs.set_status(GameState.Player.two, pokemon_name, status)
 
 			elif inp_type == '-end':
 				pokemon_data = params[0]
@@ -369,8 +375,11 @@ class BotClient(showdown.Client):
 				status = params[1]
 				if self.own_pokemon(pokemon_data):
 					self.remove_status(self.statuses, pokemon_name, status)
+					self.gs.remove_status(GameState.Player.one, pokemon_name, status)
+
 				else:
 					self.remove_status(self.opp_statuses, pokemon_name, status)
+					self.gs.remove_status(GameState.Player.two, pokemon_name, status)
 
 			elif inp_type == '-curestatus':
 				pokemon_data = params[0]
@@ -378,8 +387,12 @@ class BotClient(showdown.Client):
 				status = params[1]
 				if self.own_pokemon(pokemon_data):
 					self.remove_status(self.statuses, pokemon_name, status)
+					self.gs.remove_status(GameState.Player.one, pokemon_name, status)
+
 				else:
 					self.remove_status(self.opp_statuses, pokemon_name, status)
+					self.gs.remove_status(GameState.Player.two, pokemon_name, status)
+
 
 			elif inp_type == 'switch':
 				name_with_owner = params[0]
