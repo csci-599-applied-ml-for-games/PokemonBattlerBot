@@ -483,7 +483,14 @@ class BotClient(showdown.Client):
 				trained = self.agent.train(True)
 				if trained:
 					self.log(f'Trained')
-					self.agent.save_model()
+					path = self.agent.save_model()
+					old_epoch = self.agent.current_epoch
+					epoch = self.agent.update_epoch()
+					if old_epoch < epoch:
+						epoch_model_path = os.path.join(self.logs_dir, 
+							f'Epoch{epoch}.model')
+						self.agent.save_model(path=epoch_model_path)
+						self.agent.restart_epoch()
 				else:
 					self.log(f'Not trained')
 					
@@ -574,6 +581,15 @@ class BotClient(showdown.Client):
 	async def on_challenge_update(self, challenge_data):
 		incoming = challenge_data.get('challengesFrom', {})
 		if self.expected_opponent.lower() in incoming:
+			if not self.training:
+				modelPaths = [os.path.join(self.logs_dir, content) 
+					for content in os.listdir(self.logs_dir) 
+					if content.endswith('.model')]
+				if len(modelPaths) > 0:
+					sortedModelPaths = sorted(modelPaths, 
+						key=lambda x: 
+							int(os.path.basename(x).lstrip('Epoch').rstrip('.model')))
+					self.agent.load_model(sortedModelPaths[-1])
 			await self.accept_challenge(self.expected_opponent, self.team_text)
 
 	async def on_room_init(self, room_obj):

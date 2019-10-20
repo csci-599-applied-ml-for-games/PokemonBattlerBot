@@ -35,6 +35,10 @@ class DQNAgent():
 	def __init__(self, input_shape, log_path=None, replay_memory_path=None, 
 		model_path=None, training=True, epsilon_decay=0.99):
 
+		self.current_epoch = 0
+		self.decay_iterations = 0
+		self.min_epsilon_iterations = 0
+
 		self.input_shape = input_shape
 
 		self.model = self.create_model()
@@ -185,6 +189,10 @@ class DQNAgent():
 		if terminal_state:
 			self.target_update_counter += 1
 			self.decay_epsilon()
+			if self.epsilon > self.min_epsilon:
+				self.decay_iterations += 1
+			else:
+				self.epsilon_decay += 1
 
 		if self.target_update_counter >= self.update_target_every:
 			self.log('Updating target model')
@@ -210,3 +218,16 @@ class DQNAgent():
 		string = '{} {}'.format(prefix, ' '.join(l))
 		with open(self.log_path, 'a') as fd:
 			fd.write(f'{string}\n')
+
+	def update_epoch(self):
+		if (self.epsilon <= self.min_epsilon and 
+			self.decay_iterations <= self.min_epsilon_iterations):
+			
+			self.current_epoch += 1
+		return self.current_epoch
+
+	def restart_epoch(self):
+		self.replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
+		self.decay_iterations = 0
+		self.min_epsilon_iterations = 0
+		self.epsilon = 1
