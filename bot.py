@@ -25,6 +25,7 @@ import random
 import json 
 import csv
 import time
+import util
 from datetime import datetime
 from enum import Enum, auto
 
@@ -134,6 +135,17 @@ class BotClient(showdown.Client):
 		else:
 			self.log(f'Unexpected run type {self.runType}')
 			raise Exception('Unexpected run type')
+
+	def save_replay(self, room_obj):
+		replays_dir = os.path.join(BOT_DIR, 'replays')
+		if not os.path.exists(replays_dir):
+			os.mkdir(replays_dir)
+		
+		replay_file = f'{self.datestring}_Iteration{self.iterations_run}.html'
+		with open(os.path.join(replays_dir, replay_file), 'wt') as f:
+			f.write(util.get_replay_header())
+			f.write('\n'.join(room_obj.logs))
+			f.write(util.get_replay_footer())
 	
 	@staticmethod
 	def get_team_info(data):
@@ -251,6 +263,7 @@ class BotClient(showdown.Client):
 					self.team.append(pokename)
 				else:
 					self.opp_team.append(pokename)
+					self.opp_team_health[pokename] = ""
 
 				if (len(self.team) == self.teamsize and
 					len(self.opp_team) == self.opp_teamsize):
@@ -274,6 +287,7 @@ class BotClient(showdown.Client):
 				else:
 					self.opp_teamsize = int(params[1])
 					self.opp_team = []
+					self.opp_team_health = {}
 
 			elif inp_type == 'player':
 				name = params[1]
@@ -315,6 +329,8 @@ class BotClient(showdown.Client):
 				for pokemon_info in team_info:
 					self.log('info', pokemon_info)
 					pokemon_name = GameState.pokemon_name_clean(pokemon_info['details'])
+					# get health for each pokemon
+					self.team_health[pokemon_name] = pokemon_info['condition']
 					# get the ability for each pokemon
 					self.team_abilities[pokemon_name] = pokemon_info['ability']
 					# track the items each pokemon
@@ -326,6 +342,7 @@ class BotClient(showdown.Client):
 						# self.log('active_pokemon', self.active_pokemon)
 						# self.log('active_pokemon types', TYPE_MAP.get(self.active_pokemon))
 						#break // removed this line so it would get all the moves and stuff and things ya know
+				self.log('team health', self.team_health)
 				self.log('team abilities', self.team_abilities)
 				self.log('team items', self.team_items)
 				self.log('team moves', self.team_moves)	
@@ -476,6 +493,7 @@ class BotClient(showdown.Client):
 				self.log('Opp sidestart', self.opp_sidestart)
 
 			elif inp_type == 'error':
+				self.save_replay(room_obj)
 				if params[0].startswith('[Invalid choice]'):
 					if ("Can't switch: You can't switch to an active Pokémon" 
 						in params[0]):
@@ -485,8 +503,10 @@ class BotClient(showdown.Client):
 						await self.take_action(room_obj, self.last_request_data)
 
 			elif inp_type == 'win':
+				
+				self.save_replay(room_obj)
 				done = True
-
+				
 				winner = params[0]
 				if winner == self.name:
 					self.wins += 1
@@ -546,6 +566,15 @@ class BotClient(showdown.Client):
 				#self.log(params)
 			
 			elif inp_type == '-damage':
+				# this section is to track self and enemy health
+				if (len(params) <= 3):
+					player = params[0][0:2]
+					pokemon = params[0].strip('p1a: ').strip('p2a ')
+					health = params[1]
+					if (player == self.position):
+						self.team_health[pokemon] = health
+					else:
+						self.opp_team_health[pokemon] = health
 				# this section to track the enemy abilities
 				if (len(params) == 4):
 					pokemon = params[3].strip('[of] p1a: ')
