@@ -645,7 +645,7 @@ class BotClient(showdown.Client):
 							int(os.path.basename(x).lstrip('Epoch').rstrip('.model')))
 					model_to_load = sorted_model_paths[-1]
 					self.log(f'Loading model {model_to_load}')
-					self.agent = DQNAgent(INPUT_SHAPE, training=is_training)
+					self.agent = DQNAgent(INPUT_SHAPE, training=False)
 					self.agent.load_model(model_to_load)
 			await self.accept_challenge(self.expected_opponent, self.team_text)
 
@@ -725,6 +725,7 @@ def main():
 				agent.load_model(load_model_path)
 		else:
 			if load_model_path:
+				agent = DQNAgent(INPUT_SHAPE, training=False)
 				agent.load_model(load_model_path)
 			else:
 				agent = RandomAgent()
