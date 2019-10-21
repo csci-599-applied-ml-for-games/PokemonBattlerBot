@@ -39,7 +39,9 @@ LOGS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
 BOT_DIR = os.path.dirname(__file__)
 TYPE_MAP = {}
 
-class RandomModel():
+INPUT_SHAPE = (GameState.vector_dimension(),)
+		
+class RandomAgent():
 	def __init__(self):
 		pass
 
@@ -51,7 +53,7 @@ class RandomModel():
 		pass
 
 	def train(*args, **kwargs):
-		pass
+		return False
 
 class RunType(Enum):
 	Iterations = auto()
@@ -82,7 +84,7 @@ class BotClient(showdown.Client):
 			self.epochs = runTypeData
 
 		if agent == None:
-			self.agent = RandomModel()
+			self.agent = RandomAgent()
 		else:
 			self.agent = agent
 		self.state_vl = None
@@ -643,6 +645,7 @@ class BotClient(showdown.Client):
 							int(os.path.basename(x).lstrip('Epoch').rstrip('.model')))
 					model_to_load = sorted_model_paths[-1]
 					self.log(f'Loading model {model_to_load}')
+					self.agent = DQNAgent(INPUT_SHAPE, training=is_training)
 					self.agent.load_model(model_to_load)
 			await self.accept_challenge(self.expected_opponent, self.team_text)
 
@@ -715,20 +718,22 @@ def main():
 				TYPE_MAP[name].append(type2)
 
 	if model_type == 'dqn':
-		input_shape = (GameState.vector_dimension(),)
-
-		agent = DQNAgent(input_shape, epsilon_decay=epsilon_decay, 
-			training=is_training)
-		if load_model_path:
-			agent.load_model(load_model_path)
-
+		if not trainer:
+			agent = DQNAgent(INPUT_SHAPE, epsilon_decay=epsilon_decay, 
+				training=is_training)
+			if load_model_path:
+				agent.load_model(load_model_path)
+		else:
+			if load_model_path:
+				agent.load_model(load_model_path)
+			else:
+				agent = RandomAgent()
 
 		BotClient(name=username, password=password, 
 			expected_opponent=expected_opponent, team=team, 
 			challenge=challenge, runType=runType, runTypeData=runTypeData, 
 			agent=agent, print_stats=print_stats, trainer=trainer).start()
 	elif model_type == 'random':
-		input_shape = (GameState.vector_dimension(),)
 		BotClient(name=username, password=password, 
 			expected_opponent=expected_opponent, team=team, 
 			challenge=challenge, runType=RunType.Iterations, 
