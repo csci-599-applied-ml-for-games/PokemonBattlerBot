@@ -548,19 +548,24 @@ class BotClient(showdown.Client):
 				self.log('ability')
 				#self.log(params)
 			
-			elif inp_type == '-damage':
+			elif inp_type == 'faint':
 				player = params[0][0:2]
-				pokemon = params[0].strip('p1a: ').strip('p2a ')
-				health = params[1]
-				if 'fnt' in health:
-					self.log(f'{player}\'s {pokemon} has fainted')
-					if (player == self.position):
-						self.reward = -1
-					else:
-						self.reward = 1
+				pokemon = params[0][4:]
 
-					#TODO: add faint to gamestate
+				self.log(f'{player}\'s {pokemon} has fainted')
+				if player == self.position:
+					gs_player = GameState.Player.one
+					self.reward = -1
+				else:
+					gs_player = GameState.Player.two
+					self.reward = 1
 
+				self.gs.set_fainted(gs_player, pokemon)
+				if not self.gs.check_fainted(gs_player, pokemon):
+					self.log('ERROR: Gamestate fainted was not set as '
+						f'expected for {pokemon}')
+
+			elif inp_type == '-damage':
 				# this section to track the enemy abilities
 				if (len(params) == 4):
 					pokemon = params[3].strip('[of] p1a: ')
