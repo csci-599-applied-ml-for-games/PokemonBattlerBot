@@ -235,6 +235,7 @@ class BotClient(showdown.Client):
 					self.team.append(pokename)
 				else:
 					self.opp_team.append(pokename)
+					self.opp_team_health[pokename] = ""
 
 				if (len(self.team) == self.teamsize and
 					len(self.opp_team) == self.opp_teamsize):
@@ -258,6 +259,7 @@ class BotClient(showdown.Client):
 				else:
 					self.opp_teamsize = int(params[1])
 					self.opp_team = []
+					self.opp_team_health = {}
 
 			elif inp_type == 'player':
 				name = params[1]
@@ -299,6 +301,8 @@ class BotClient(showdown.Client):
 				for pokemon_info in team_info:
 					self.log('info', pokemon_info)
 					pokemon_name = GameState.pokemon_name_clean(pokemon_info['details'])
+					# get health for each pokemon
+					self.team_health[pokemon_name] = pokemon_info['condition']
 					# get the ability for each pokemon
 					self.team_abilities[pokemon_name] = pokemon_info['ability']
 					# track the items each pokemon
@@ -310,6 +314,7 @@ class BotClient(showdown.Client):
 						# self.log('active_pokemon', self.active_pokemon)
 						# self.log('active_pokemon types', TYPE_MAP.get(self.active_pokemon))
 						#break // removed this line so it would get all the moves and stuff and things ya know
+				self.log('team health', self.team_health)
 				self.log('team abilities', self.team_abilities)
 				self.log('team items', self.team_items)
 				self.log('team moves', self.team_moves)	
@@ -525,6 +530,15 @@ class BotClient(showdown.Client):
 				#self.log(params)
 			
 			elif inp_type == '-damage':
+				# this section is to track self and enemy health
+				if (len(params) <= 3):
+					player = params[0][0:2]
+					pokemon = params[0].strip('p1a: ').strip('p2a ')
+					health = params[1]
+					if (player == self.position):
+						self.team_health[pokemon] = health
+					else:
+						self.opp_team_health[pokemon] = health
 				# this section to track the enemy abilities
 				if (len(params) == 4):
 					pokemon = params[3].strip('[of] p1a: ')
