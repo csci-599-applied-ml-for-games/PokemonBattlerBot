@@ -21,7 +21,7 @@ LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
 
 DISCOUNT = 0.99
 REPLAY_MEMORY_SIZE = 50_000
-MIN_REPLAY_MEMORY_SIZE = 1000
+MIN_REPLAY_MEMORY_SIZE = 64
 MINIBATCH_SIZE = 64
 
 class ActionType(Enum):
@@ -192,7 +192,7 @@ class DQNAgent():
 			if self.epsilon > self.min_epsilon:
 				self.decay_iterations += 1
 			else:
-				self.epsilon_decay += 1
+				self.min_epsilon_iterations += 1
 
 		if self.target_update_counter >= self.update_target_every:
 			self.log('Updating target model')
@@ -220,13 +220,18 @@ class DQNAgent():
 			fd.write(f'{string}\n')
 
 	def update_epoch(self):
+		self.log('update_epoch')
+		self.log(f'decay_iterations: {self.decay_iterations}')
+		self.log(f'min_epsilon_iterations: {self.min_epsilon_iterations}')
 		if (self.epsilon <= self.min_epsilon and 
 			self.decay_iterations <= self.min_epsilon_iterations):
 			
 			self.current_epoch += 1
+		self.log(f'current_epoch is now {self.current_epoch}')
 		return self.current_epoch
 
 	def restart_epoch(self):
+		self.log('restart epoch')
 		self.replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
 		self.decay_iterations = 0
 		self.min_epsilon_iterations = 0

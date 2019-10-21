@@ -1,6 +1,6 @@
 '''
 Usage:
-	bot.py <username> <password> <expected_opponent> [--forever|--iterations=<iterations>|--epochs=<epochs>] [--challenge] [--modeltype=<modeltype>] [--load_model=<model_path>] [--epsilondecay=<epsilondecay>] [--notraining] [--printstats]
+	bot.py <username> <password> <expected_opponent> [--forever|--iterations=<iterations>|--epochs=<epochs>] [--challenge] [--modeltype=<modeltype>] [--load_model=<model_path>] [--epsilondecay=<epsilondecay>] [--notraining|--trainer] [--printstats]
 
 Arguments:
 	<username> 			Username for the client
@@ -15,6 +15,7 @@ Options:
 	--forever			Run until someone kills the process 
 	--challenge 		Challenge the expected_opponent when not playing a game
 	--notraining		Just run with the model. No training
+	--trainer  			If acting as a trainer for another process
 	--printstats 		Prints the win/loss rate of this process 
 '''
 
@@ -61,7 +62,7 @@ class BotClient(showdown.Client):
 	def __init__(self, name='', password='', loop=None, max_room_logs=5000,
 		server_id='showdown', server_host=None, expected_opponent=None,
 		team=None, challenge=False, runType=RunType.Iterations, runTypeData=1,
-		agent=None, print_stats=False):
+		agent=None, print_stats=False, trainer=False):
 
 		if expected_opponent == None:
 			raise Exception("No expected opponent found in arguments")
@@ -100,6 +101,8 @@ class BotClient(showdown.Client):
 		self.losses = 0
 		self.print_stats = print_stats
 
+		self.trainer = trainer
+
 		super().__init__(name=name, password=password, loop=loop, 
 			max_room_logs=max_room_logs, server_id=server_id, 
 			server_host=server_host)
@@ -115,10 +118,11 @@ class BotClient(showdown.Client):
 			f'{self.datestring}_Iteration{self.iterations_run}.model')
 
 	def log(self, *args):
+		now = datetime.now()
 		l = [str(arg) for arg in args]
 		string = ' '.join(l)
 		with open(self.log_file, 'a') as fd:
-			fd.write(f'{string}\n')
+			fd.write(f'[{datetime.now()}] {string}\n')
 
 	def should_play_new_game(self):
 		if self.runType == RunType.Iterations:
@@ -511,6 +515,7 @@ class BotClient(showdown.Client):
 					old_epoch = self.agent.current_epoch
 					epoch = self.agent.update_epoch()
 					if old_epoch < epoch:
+						self.log('Saving epoch model')
 						epoch_model_path = os.path.join(self.logs_dir, 
 							f'Epoch{epoch}.model')
 						self.agent.save_model(path=epoch_model_path)
@@ -605,15 +610,18 @@ class BotClient(showdown.Client):
 	async def on_challenge_update(self, challenge_data):
 		incoming = challenge_data.get('challengesFrom', {})
 		if self.expected_opponent.lower() in incoming:
-			if not self.training:
-				modelPaths = [os.path.join(self.logs_dir, content) 
+			if self.trainer:
+				model_paths = [os.path.join(self.logs_dir, content) 
 					for content in os.listdir(self.logs_dir) 
-					if content.endswith('.model')]
-				if len(modelPaths) > 0:
-					sortedModelPaths = sorted(modelPaths, 
+					if content.endswith('.model') and 
+						content.startswith('Epoch')]
+				if len(model_paths) > 0:
+					sorted_model_paths = sorted(model_paths, 
 						key=lambda x: 
 							int(os.path.basename(x).lstrip('Epoch').rstrip('.model')))
-					self.agent.load_model(sortedModelPaths[-1])
+					model_to_load = sorted_model_paths[-1]
+					self.log(f'Loading model {model_to_load}')
+					self.agent.load_model(model_to_load)
 			await self.accept_challenge(self.expected_opponent, self.team_text)
 
 	async def on_room_init(self, room_obj):
@@ -660,7 +668,12 @@ def main():
 	epsilon_decay = (float(args['--epsilondecay']) 
 		if args['--epsilondecay'] != None 
 		else 0.99)
-	is_training = not args['--notraining'] 
+	trainer = args['--trainer']
+	if trainer:
+		is_training = False
+	else:
+		is_training = not args['--notraining'] 
+
 	load_model_path = args.get('--load_model')
 	print_stats = args.get('--printstats')
 
@@ -691,7 +704,7 @@ def main():
 		BotClient(name=username, password=password, 
 			expected_opponent=expected_opponent, team=team, 
 			challenge=challenge, runType=runType, runTypeData=runTypeData, 
-			agent=agent, print_stats=print_stats).start()
+			agent=agent, print_stats=print_stats, trainer=trainer).start()
 	elif model_type == 'random':
 		input_shape = (GameState.vector_dimension(),)
 		BotClient(name=username, password=password, 
