@@ -1,10 +1,31 @@
+'''
+Usage:
+	bot.py <username> <password> <expected_opponent> [--iterations=<iterations>] [--challenge] [--modeltype=<modeltype>] [--load_model=<model_path>] [--epsilondecay=<epsilondecay>] [--notraining] [--printstats]
+
+Arguments:
+	<username> 			Username for the client
+	<password>			Password for the account <username>
+	<expected_opponent> The account name for the expected opponent
+	<modeltype>			The type of model to use for the test
+	<epsilondecay>		The decay rate for epsilon 
+	<model_path> 		Path to a model to load into DQN agent 
+Options:
+	--iterations 		The number of iterations to play against the opponent
+	--challenge 		Challenge the expected_opponent when not playing a game
+	--notraining		Just run with the model. No training
+	--printstats 		Prints the win/loss rate of this process 
+'''
+
 import sys
 import os
 import random 
 import json 
 import csv
 import time
+import util
 from datetime import datetime
+
+from docopt import docopt 
 
 import showdown 
 
@@ -32,7 +53,8 @@ class RandomModel():
 class BotClient(showdown.Client):
 	def __init__(self, name='', password='', loop=None, max_room_logs=5000,
 		server_id='showdown', server_host=None, expected_opponent=None,
-		team=None, challenge=False, iterations=1, model=None):
+		team=None, challenge=False, iterations=1, agent=None, 
+		print_stats=False):
 
 		if expected_opponent == None:
 			raise Exception("No expected opponent found in arguments")
@@ -46,10 +68,10 @@ class BotClient(showdown.Client):
 		self.iterations_run = 0
 		self.iterations = iterations 
 
-		if model == None:
-			self.model = RandomModel()
+		if agent == None:
+			self.agent = RandomModel()
 		else:
-			self.model = model
+			self.agent = agent
 		self.state_vl = None
 		self.action = None
 
@@ -62,6 +84,10 @@ class BotClient(showdown.Client):
 		self.challenge = challenge
 		self.has_challenged = False
 
+		self.wins = 0
+		self.losses = 0
+		self.print_stats = print_stats
+
 		super().__init__(name=name, password=password, loop=loop, 
 			max_room_logs=max_room_logs, server_id=server_id, 
 			server_host=server_host)
@@ -69,16 +95,29 @@ class BotClient(showdown.Client):
 	def update_log_paths(self):
 		self.log_file = os.path.join(self.logs_dir, 
 			f'{self.datestring}_Iteration{self.iterations_run}.txt')
-		self.model.log_path = self.log_file
-		self.model.replay_memory_path = os.path.join(self.logs_dir, 
+		self.agent.log_path = self.log_file
+		self.agent.replay_memory_path = os.path.join(self.logs_dir, 
 			f'{self.datestring}_Iteration{self.iterations_run}_'
 			'replaymemory.txt')
+		self.agent.model_path = os.path.join(self.logs_dir, 
+			f'{self.datestring}_Iteration{self.iterations_run}.model')
 
 	def log(self, *args):
 		l = [str(arg) for arg in args]
 		string = ' '.join(l)
 		with open(self.log_file, 'a') as fd:
 			fd.write(f'{string}\n')
+
+	def save_replay(self, room_obj):
+		replays_dir = os.path.join(BOT_DIR, 'replays')
+		if not os.path.exists(replays_dir):
+			os.mkdir(replays_dir)
+		
+		replay_file = f'{self.datestring}_Iteration{self.iterations_run}.html'
+		with open(os.path.join(replays_dir, replay_file), 'wt') as f:
+			f.write(util.get_replay_header())
+			f.write('\n'.join(room_obj.logs))
+			f.write(util.get_replay_footer())
 	
 	@staticmethod
 	def get_team_info(data):
@@ -103,9 +142,10 @@ class BotClient(showdown.Client):
 		self.log(f'Moves: {moves}')
 		valid_actions = []
 		for move_index, move_data in enumerate(moves):
-			valid_actions.append((move_index + 1, 
-				move_data['move'], 
-				ActionType.Move))
+			if move_data.get('pp', 0) > 0:
+				valid_actions.append((move_index + 1, 
+					move_data['move'], 
+					ActionType.Move))
 		move_count = len(moves)
 
 		team_info = self.get_team_info(data)
@@ -123,7 +163,7 @@ class BotClient(showdown.Client):
 		self.log(f'valid_actions: {valid_actions}')
 
 		action_index, action_string, action_type, self.action = \
-			self.model.get_action(self.gs.vector_list, valid_actions)
+			self.agent.get_action(self.gs.vector_list, valid_actions)
 
 		if action_type == ActionType.Move:
 			await room_obj.move(action_index) 
@@ -247,9 +287,9 @@ class BotClient(showdown.Client):
 						self.state_vl, 
 						done)
 					self.log(f'Updating replay memory with {transition}')
-					self.model.update_replay_memory(transition)
+					self.agent.update_replay_memory(transition)
 					self.log(f'Successfully updated replay memory')
-					self.model.train(False)
+					self.agent.train(False)
 					self.log(f'Trained')
 
 			elif inp_type == 'request':
@@ -424,6 +464,7 @@ class BotClient(showdown.Client):
 				self.log('Opp sidestart', self.opp_sidestart)
 
 			elif inp_type == 'error':
+				self.save_replay(room_obj)
 				if params[0].startswith('[Invalid choice]'):
 					if ("Can't switch: You can't switch to an active Pokémon" 
 						in params[0]):
@@ -433,13 +474,17 @@ class BotClient(showdown.Client):
 						await self.take_action(room_obj, self.last_request_data)
 
 			elif inp_type == 'win':
+				
+				self.save_replay(room_obj)
 				done = True
-
+				
 				winner = params[0]
 				if winner == self.name:
+					self.wins += 1
 					self.log("We won")
 					reward = 10000 #NOTE: Reward is chosen somewhat arbitrarily
 				else:
+					self.losses += 1
 					self.log("We lost")
 					reward = -10000
 
@@ -452,12 +497,14 @@ class BotClient(showdown.Client):
 					self.state_vl, 
 					done)
 				self.log(f'Updating replay memory with {transition}')
-				self.model.update_replay_memory(transition)
+				self.agent.update_replay_memory(transition)
 				self.log(f'Successfully updated replay memory')
-				self.model.train(True)
-				self.log(f'Trained')
-				#TODO: save model so other client can keep improving...?
-				#TODO: or can they just both improve?
+				trained = self.agent.train(True)
+				if trained:
+					self.log(f'Trained')
+					self.agent.save_model()
+				else:
+					self.log(f'Not trained')
 					
 				await room_obj.leave()
 				self.iterations_run += 1
@@ -469,6 +516,10 @@ class BotClient(showdown.Client):
 						time.sleep(5)
 						await self.challenge_expected()
 				else:
+					if self.print_stats:
+						win_ratio = (float(self.wins) / 
+							float(self.wins + self.losses))
+						print(f'Win ratio: {win_ratio}')
 					sys.exit(0)
 
 			elif inp_type == '-ability':
@@ -558,16 +609,21 @@ class BotClient(showdown.Client):
 			self.weather = 'none'
 
 def main():
-	if len(sys.argv) != 5 and len(sys.argv) != 6:
-		print('Usage: python bot.py <iterations> <username> <password> <expected_opponent> '
-			'[--challenge]')
-		return 
+	args = docopt(__doc__) 
 
-	iterations = int(sys.argv[1])
-	username = sys.argv[2]
-	password = sys.argv[3]
-	expected_opponent = sys.argv[4]
-	challenge = len(sys.argv) == 6
+	username = args['<username>']
+	password = args['<password>']
+	expected_opponent = args['<expected_opponent>']
+	iterations = (int(args['--iterations']) if args['--iterations'] != None 
+		else 1) 
+	challenge = args['--challenge']
+	model_type = args['--modeltype'] if args['--modeltype'] != None else 'dqn'
+	epsilon_decay = (float(args['--epsilondecay']) 
+		if args['--epsilondecay'] != None 
+		else 0.99)
+	is_training = not args['--notraining'] 
+	load_model_path = args.get('--load_model')
+	print_stats = args.get('--printstats')
 
 	with open(os.path.join(BOT_DIR, 'teams/PokemonTeam'), 'rt') as teamfd:
 		team = teamfd.read()
@@ -584,19 +640,24 @@ def main():
 			if type2 != '':
 				TYPE_MAP[name].append(type2)
 
-	model_type = 'dqn' #TODO: move out to command line argument
 	if model_type == 'dqn':
 		input_shape = (GameState.vector_dimension(),)
+
+		agent = DQNAgent(input_shape, epsilon_decay=epsilon_decay, 
+			training=is_training)
+		if load_model_path:
+			agent.load_model(load_model_path)
+
 		BotClient(name=username, password=password, 
 			expected_opponent=expected_opponent, team=team, 
 			challenge=challenge, iterations=iterations, 
-			model=DQNAgent(input_shape)).start()
+			agent=agent, print_stats=print_stats).start()
 	elif model_type == 'random':
 		input_shape = (GameState.vector_dimension(),)
 		BotClient(name=username, password=password, 
 			expected_opponent=expected_opponent, team=team, 
 			challenge=challenge, iterations=iterations, 
-			model=None).start()
+			agent=None, print_stats=print_stats).start()
 
 if __name__ == '__main__':
 	random.seed()
