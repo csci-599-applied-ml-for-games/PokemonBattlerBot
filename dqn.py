@@ -21,7 +21,7 @@ LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
 
 DISCOUNT = 0.99
 REPLAY_MEMORY_SIZE = 50_000
-MIN_REPLAY_MEMORY_SIZE = 64
+MIN_REPLAY_MEMORY_SIZE = 1000
 MINIBATCH_SIZE = 64
 
 class ActionType(Enum):
