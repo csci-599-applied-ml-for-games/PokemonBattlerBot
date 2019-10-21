@@ -285,9 +285,12 @@ class BotClient(showdown.Client):
 				self.turn_number = int(params[0])
 				if self.turn_number == 1:
 					self.state_vl = self.gs.vector_list
+					self.reward = 0
+					reward = self.reward
 				else:
 					#NOTE: this should be changed if using other reward functions besides win or lose the game
-					reward = 0
+					reward = self.reward
+					self.reward = 0
 					
 					last_state = [element for element in self.state_vl]
 					self.state_vl = self.gs.vector_list
@@ -303,7 +306,7 @@ class BotClient(showdown.Client):
 					self.log(f'Successfully updated replay memory')
 					self.agent.train(False)
 					self.log(f'Trained')
-
+				self.log(f'This transition\'s reward was {reward}')
 			elif inp_type == 'request':
 				json_string = params[0]
 				data = json.loads(json_string)
@@ -491,11 +494,11 @@ class BotClient(showdown.Client):
 				if winner == self.name:
 					self.wins += 1
 					self.log("We won")
-					reward = 10000 #NOTE: Reward is chosen somewhat arbitrarily
+					reward = 12 
 				else:
 					self.losses += 1
 					self.log("We lost")
-					reward = -10000
+					reward = -12
 
 				last_state = [element for element in self.state_vl]
 				self.state_vl = self.gs.vector_list
@@ -546,6 +549,18 @@ class BotClient(showdown.Client):
 				#self.log(params)
 			
 			elif inp_type == '-damage':
+				player = params[0][0:2]
+				pokemon = params[0].strip('p1a: ').strip('p2a ')
+				health = params[1]
+				if 'fnt' in health:
+					self.log(f'{player}\'s {pokemon} has fainted')
+					if (player == self.position):
+						self.reward = -1
+					else:
+						self.reward = 1
+
+					#TODO: add faint to gamestate
+
 				# this section to track the enemy abilities
 				if (len(params) == 4):
 					pokemon = params[3].strip('[of] p1a: ')
