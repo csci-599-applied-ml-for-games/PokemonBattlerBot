@@ -154,7 +154,7 @@ class BotClient(showdown.Client):
 		self.log(f'Moves: {moves}')
 		valid_actions = []
 		for move_index, move_data in enumerate(moves):
-			if move_data.get('pp', 0) > 0:
+			if move_data.get('pp', 0) > 0 and not move_data.get('disabled'):
 				valid_actions.append((move_index + 1, 
 					move_data['move'], 
 					ActionType.Move))
