@@ -25,6 +25,7 @@ import random
 import json 
 import csv
 import time
+import util
 from datetime import datetime
 from enum import Enum, auto
 import re
@@ -195,6 +196,17 @@ class BotClient(showdown.Client):
 		else:
 			self.log(f'Unexpected run type {self.runType}')
 			raise Exception('Unexpected run type')
+
+	def save_replay(self, room_obj):
+		replays_dir = os.path.join(BOT_DIR, 'replays')
+		if not os.path.exists(replays_dir):
+			os.mkdir(replays_dir)
+		
+		replay_file = f'{self.datestring}_Iteration{self.iterations_run}.html'
+		with open(os.path.join(replays_dir, replay_file), 'wt') as f:
+			f.write(util.get_replay_header())
+			f.write('\n'.join(room_obj.logs))
+			f.write(util.get_replay_footer())
 	
 	@staticmethod
 	def get_team_info(data):
@@ -558,6 +570,7 @@ class BotClient(showdown.Client):
 				self.log('Opp sidestart', self.opp_sidestart)
 
 			elif inp_type == 'error':
+				self.save_replay(room_obj)
 				if params[0].startswith('[Invalid choice]'):
 					if ("Can't switch: You can't switch to an active Pokémon" 
 						in params[0]):
@@ -567,8 +580,10 @@ class BotClient(showdown.Client):
 						await self.take_action(room_obj, self.last_request_data)
 
 			elif inp_type == 'win':
+				
+				self.save_replay(room_obj)
 				done = True
-
+				
 				winner = params[0]
 				if winner == self.name:
 					self.wins += 1
