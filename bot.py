@@ -292,6 +292,19 @@ class BotClient(showdown.Client):
 					self.reward = 0
 					reward = self.reward
 				else:
+					self.log(f'P1 fainted: {self.gs.all_fainted(GameState.Player.one)}')
+					self.log(f'P2 fainted: {self.gs.all_fainted(GameState.Player.two)}')
+
+					active_pokemon = self.gs.all_active(GameState.Player.one)
+					self.log(f'P1 active: {active_pokemon}')
+					if len(active_pokemon) > 1:
+						self.log('ERROR: More than one active pokemon')
+
+					active_pokemon = self.gs.all_active(GameState.Player.two)
+					self.log(f'P2 active: {active_pokemon}')
+					if len(active_pokemon) > 1:
+						self.log('ERROR: More than one active pokemon')
+
 					#NOTE: this should be changed if using other reward functions besides win or lose the game
 					reward = self.reward
 					self.reward = 0
@@ -498,11 +511,11 @@ class BotClient(showdown.Client):
 				if winner == self.name:
 					self.wins += 1
 					self.log("We won")
-					reward = 12 
+					reward = 10000 
 				else:
 					self.losses += 1
 					self.log("We lost")
-					reward = -12
+					reward = -10000
 
 				last_state = [element for element in self.state_vl]
 				self.state_vl = self.gs.vector_list
@@ -554,7 +567,7 @@ class BotClient(showdown.Client):
 			
 			elif inp_type == 'faint':
 				player = params[0][0:2]
-				pokemon = params[0][4:]
+				pokemon = params[0][4:].strip()
 
 				self.log(f'{player}\'s {pokemon} has fainted')
 				if player == self.position:
@@ -565,6 +578,7 @@ class BotClient(showdown.Client):
 					self.reward = 1
 
 				self.gs.set_fainted(gs_player, pokemon)
+				self.log('set_fainted called successfully')
 				if not self.gs.check_fainted(gs_player, pokemon):
 					self.log('ERROR: Gamestate fainted was not set as '
 						f'expected for {pokemon}')

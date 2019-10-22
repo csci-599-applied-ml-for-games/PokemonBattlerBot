@@ -188,12 +188,21 @@ class GameState():
 		return (self.vector_list[player * GameState.num_player_elements +
 			position * ATTRIBUTES_PER_POKEMON + ACTIVE_STATE] == 1.0)
 
+	def all_active(self, player):
+		active_pokemon = []
+		team = self.name_to_position[player]
+		for name in team:
+			if self.check_active(name):
+				active_pokemon.append(name)
+		return active_pokemon
+
 	def _set_fainted(self, player, position, value):
 		self.vector_list[player * GameState.num_player_elements +
 			position * ATTRIBUTES_PER_POKEMON + FAINTED_STATE] = value
 
 	def set_fainted(self, player, name):
 		team_position = self.name_to_position[player][name]
+		self._set_active(player, team_position, 0.0)
 		self._set_fainted(player, team_position, 1.0)
 
 	def check_fainted(self, player, name):
@@ -201,6 +210,17 @@ class GameState():
 		position = self.name_to_position[player][name]
 		return (self.vector_list[player * GameState.num_player_elements +
 			position * ATTRIBUTES_PER_POKEMON + FAINTED_STATE] == 1.0)
+
+	def all_fainted(self, player):
+		'''
+		Returns all of the fainted pokemon for player as a list of strings
+		'''
+		fainted = []
+		team = self.name_to_position[player]
+		for name in team:
+			if self.check_fainted(player, name):
+				fainted.append(name)
+		return fainted
 
 	def _set_move(self, player, position, move_position, value):
 		self.vector_list[player * GameState.num_player_elements +
