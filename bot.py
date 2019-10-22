@@ -275,6 +275,9 @@ class BotClient(showdown.Client):
 					self.set_and_check_team(GameState.Player.one, self.team)
 					self.set_and_check_team(GameState.Player.two, self.opp_team)
 
+					self.gs.init_health(GameState.Player.one)
+					self.gs.init_health(GameState.Player.two)
+
 					#NOTE: Select starting pokemon here 
 					start_index = random.randint(1, self.teamsize)
 					await room_obj.start_poke(start_index)
@@ -307,14 +310,17 @@ class BotClient(showdown.Client):
 				if len(active_pokemon) > 1:
 					self.log('ERROR: More than one active pokemon')
 
+				self.log(f'P1 health: {self.gs.all_health(GameState.Player.one)}')
+				self.log(f'P2 health: {self.gs.all_health(GameState.Player.two)}')
+
+				self.log(f'P1 fainted: {self.gs.all_fainted(GameState.Player.one)}')
+				self.log(f'P2 fainted: {self.gs.all_fainted(GameState.Player.two)}')
+
 				if self.turn_number == 1:
 					self.state_vl = self.gs.vector_list
 					self.reward = 0
 					reward = self.reward
 				else:
-					self.log(f'P1 fainted: {self.gs.all_fainted(GameState.Player.one)}')
-					self.log(f'P2 fainted: {self.gs.all_fainted(GameState.Player.two)}')
-
 					#NOTE: this should be changed if using other reward functions besides win or lose the game
 					reward = self.reward
 					self.reward = 0
@@ -615,7 +621,7 @@ class BotClient(showdown.Client):
 						else:
 							gs_player = GameState.Player.two
 
-						#TODO: track pokemon health in gs
+						self.gs.set_health(gs_player, pokemon, normalized_health)
 					else:
 						self.log(f'Could not track health for pokemon {pokemon}')
 				
@@ -626,6 +632,26 @@ class BotClient(showdown.Client):
 					# self.enemy_state.update_abilities(pokemon, ability)
 					self.log('Pokemon: ', pokemon, 'Enemy Ability: ', self.enemy_state.team_abilities[pokemon])
 			
+			elif inp_type == '-heal':
+				player = params[0][0:2]
+				pokemon = params[0].lstrip('p1a: ').lstrip('p2a: ').strip()
+				pokemon = hack_name(pokemon)
+				health_data = params[1]
+
+				match = self.health_regex.search(health_data)
+				if match:
+					normalized_health = (float(match.group('numerator')) / 
+						float(match.group('denominator')))
+					self.log(f'{pokemon} has health {normalized_health}')
+					if player == self.position:
+						gs_player = GameState.Player.one
+					else:
+						gs_player = GameState.Player.two
+
+					self.gs.set_health(gs_player, pokemon, normalized_health)
+				else:
+					self.log(f'Could not track health for pokemon {pokemon}')
+
 			elif inp_type == '-mega':
 				if ('p1a' in str(params[0])):
 					# Opposing player Mega 
