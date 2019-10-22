@@ -27,6 +27,7 @@ import csv
 import time
 from datetime import datetime
 from enum import Enum, auto
+import re
 
 from docopt import docopt 
 
@@ -60,7 +61,15 @@ class RunType(Enum):
 	Epochs = auto()
 	Forever = auto()
 
+def hack_name(pokemon):
+	if pokemon == 'Tornadus': 
+		return 'Tornadus-Therian'
+	else:
+		return pokemon
+
 class BotClient(showdown.Client):
+	health_regex = re.compile(r'(?P<numerator>[0-9]+)/(?P<denominator>[0-9]+)')
+
 	def __init__(self, name='', password='', loop=None, max_room_logs=5000,
 		server_id='showdown', server_host=None, expected_opponent=None,
 		team=None, challenge=False, runType=RunType.Iterations, runTypeData=1,
@@ -574,8 +583,7 @@ class BotClient(showdown.Client):
 
 				#TODO: remove this hack and have a good way of handling
 				#TODO: detailed vs. non-detailed pokemon names
-				if pokemon == 'Tornadus': 
-					pokemon = 'Tornadus-Therian'
+				pokemon = hack_name(pokemon)
 
 				self.log(f'{player}\'s {pokemon} has fainted')
 				if player == self.position:
@@ -592,8 +600,27 @@ class BotClient(showdown.Client):
 						f'expected for {pokemon}')
 
 			elif inp_type == '-damage':
+				if len(params) <= 3:
+					player = params[0][0:2]
+					pokemon = params[0].lstrip('p1a: ').lstrip('p2a: ').strip()
+					pokemon = hack_name(pokemon)
+					health_data = params[1]
+					match = self.health_regex.search(health_data)
+					if match:
+						normalized_health = (float(match.group('numerator')) / 
+							float(match.group('denominator')))
+						self.log(f'{pokemon} has health {normalized_health}')
+						if player == self.position:
+							gs_player = GameState.Player.one
+						else:
+							gs_player = GameState.Player.two
+
+						#TODO: track pokemon health in gs
+					else:
+						self.log(f'Could not track health for pokemon {pokemon}')
+				
 				# this section to track the enemy abilities
-				if (len(params) == 4):
+				elif len(params) == 4:
 					pokemon = params[3].strip('[of] p1a: ')
 					ability = params[2].strip('[from] ability: ')
 					# self.enemy_state.update_abilities(pokemon, ability)
