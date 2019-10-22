@@ -569,6 +569,11 @@ class BotClient(showdown.Client):
 				player = params[0][0:2]
 				pokemon = params[0][4:].strip()
 
+				#TODO: remove this hack and have a good way of handling
+				#TODO: detailed vs. non-detailed pokemon names
+				if pokemon == 'Tornadus': 
+					pokemon = 'Tornadus-Therian'
+
 				self.log(f'{player}\'s {pokemon} has fainted')
 				if player == self.position:
 					gs_player = GameState.Player.one
