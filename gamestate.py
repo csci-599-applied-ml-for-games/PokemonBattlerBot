@@ -500,14 +500,38 @@ if __name__ == '__main__':
 			continue
 
 		gs.init_health(player)
-		p1_health_sum = health_sum(gs.vector_list, player)
-		if p1_health_sum != 6.0:
+		player_health_sum = health_sum(gs.vector_list, player)
+		if player_health_sum != 6.0:
 			print('ERROR: unexpected health sum after init')
 		for position in range(len(gs.name_to_position[player])):
 			gs._set_health(player, position, 0.0)
 
-			p1_health_sum = health_sum(gs.vector_list, player)
+			player_health_sum = health_sum(gs.vector_list, player)
 			expected_sum = 6.0 - (position + 1)
-			if p1_health_sum != expected_sum:
+			if player_health_sum != expected_sum:
 				print('ERROR: unexpected health sum. ' 
-					f'Expected {expected_sum} but had {p1_health_sum}')
+					f'Expected {expected_sum} but had {player_health_sum}')
+
+
+	for player in GameState.Player:
+		if player == GameState.Player.count:
+			continue
+
+		for position in range(len(gs.name_to_position[player])):
+			gs._set_fainted(player, position, 0.0)
+
+		player_ko_count = ko_count(gs.vector_list, player)
+		if player_ko_count != 0.0:
+			print('ERROR: unexpected player_ko_count after setup')
+
+		if player == GameState.Player.one: 
+			team = team1 
+		else:
+			team = team2
+		for expected_index, expected_name in enumerate(team): 
+			gs.set_fainted(player, expected_name)		
+			player_ko_count = ko_count(gs.vector_list, player)
+			expected_ko_count = expected_index + 1
+			if player_ko_count != expected_ko_count:
+				print(f'ERROR: expected {expected_ko_count} KOs but had '
+					f'{player_ko_count}')
