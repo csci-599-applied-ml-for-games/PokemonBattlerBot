@@ -573,11 +573,11 @@ class BotClient(showdown.Client):
 				if winner == self.name:
 					self.wins += 1
 					self.log("We won")
-					reward = 104
+					reward = 10000
 				else:
 					self.losses += 1
 					self.log("We lost")
-					reward = -104
+					reward = -10000
 
 				last_state = [element for element in self.state_vl]
 				self.state_vl = self.gs.vector_list
