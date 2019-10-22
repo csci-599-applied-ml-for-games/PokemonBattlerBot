@@ -287,6 +287,17 @@ class BotClient(showdown.Client):
 
 			elif inp_type == 'turn':
 				self.turn_number = int(params[0])
+				
+				active_pokemon = self.gs.all_active(GameState.Player.one)
+				self.log(f'P1 active: {active_pokemon}')
+				if len(active_pokemon) > 1:
+					self.log('ERROR: More than one active pokemon')
+
+				active_pokemon = self.gs.all_active(GameState.Player.two)
+				self.log(f'P2 active: {active_pokemon}')
+				if len(active_pokemon) > 1:
+					self.log('ERROR: More than one active pokemon')
+
 				if self.turn_number == 1:
 					self.state_vl = self.gs.vector_list
 					self.reward = 0
@@ -294,16 +305,6 @@ class BotClient(showdown.Client):
 				else:
 					self.log(f'P1 fainted: {self.gs.all_fainted(GameState.Player.one)}')
 					self.log(f'P2 fainted: {self.gs.all_fainted(GameState.Player.two)}')
-
-					active_pokemon = self.gs.all_active(GameState.Player.one)
-					self.log(f'P1 active: {active_pokemon}')
-					if len(active_pokemon) > 1:
-						self.log('ERROR: More than one active pokemon')
-
-					active_pokemon = self.gs.all_active(GameState.Player.two)
-					self.log(f'P2 active: {active_pokemon}')
-					if len(active_pokemon) > 1:
-						self.log('ERROR: More than one active pokemon')
 
 					#NOTE: this should be changed if using other reward functions besides win or lose the game
 					reward = self.reward
@@ -448,7 +449,8 @@ class BotClient(showdown.Client):
 				if not my_pokemon:
 					self.opp_active_pokemon = new_active_name
 					self.log('Opp active', self.opp_active_pokemon)
-					self.set_active(GameState.Player.two, self.opp_active_pokemon)
+					self.gs.set_active(GameState.Player.two, self.opp_active_pokemon)
+					self.log('set_active called for p2')
 					if not self.gs.check_active(GameState.Player.two, 
 						self.opp_active_pokemon):
 						
@@ -457,7 +459,8 @@ class BotClient(showdown.Client):
 				else:
 					self.active_pokemon = new_active_name
 					self.log('active_pokemon', self.active_pokemon)
-					self.set_active(GameState.Player.one, self.active_pokemon)
+					self.gs.set_active(GameState.Player.one, self.active_pokemon)
+					self.log('set_active called for p1')
 					if not self.gs.check_active(GameState.Player.one, 
 						self.active_pokemon):
 						

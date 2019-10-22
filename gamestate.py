@@ -192,7 +192,7 @@ class GameState():
 		active_pokemon = []
 		team = self.name_to_position[player]
 		for name in team:
-			if self.check_active(name):
+			if self.check_active(player, name):
 				active_pokemon.append(name)
 		return active_pokemon
 
