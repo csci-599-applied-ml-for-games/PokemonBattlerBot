@@ -85,6 +85,20 @@ NORMALIZED_HEALTH = increment_index()
 
 ATTRIBUTES_PER_POKEMON = INDEX_TRACKER + 1
 
+def health_sum(vector_list, player):
+	total = 0
+	for position in range(GameState.max_team_size):
+		total += vector_list[player * GameState.num_player_elements +
+			position * ATTRIBUTES_PER_POKEMON + NORMALIZED_HEALTH]
+	return total
+
+def ko_count(vector_list, player):
+	total = 0
+	for position in range(GameState.max_team_size):
+		total += vector_list[player * GameState.num_player_elements +
+			position * ATTRIBUTES_PER_POKEMON + FAINTED_STATE]
+	return total
+
 class GameState():
 	class Player(IntEnum):
 		'''
@@ -141,7 +155,7 @@ class GameState():
 		self._set_health(player, position, value)
 
 	def init_health(self, player):
-		for team_position in range(self.max_team_size):
+		for team_position in range(len(self.name_to_position[player])):
 			self._set_health(player, team_position, 1.0)
 
 	def check_health(self, player, name):
@@ -480,3 +494,20 @@ if __name__ == '__main__':
 				print(gs_health)
 				print('gs_health had unexpected values when testing set_health')
 			gs.set_health(player, pokemon, 1.0)
+
+	for player in GameState.Player:
+		if player == GameState.Player.count:
+			continue
+
+		gs.init_health(player)
+		p1_health_sum = health_sum(gs.vector_list, player)
+		if p1_health_sum != 6.0:
+			print('ERROR: unexpected health sum after init')
+		for position in range(len(gs.name_to_position[player])):
+			gs._set_health(player, position, 0.0)
+
+			p1_health_sum = health_sum(gs.vector_list, player)
+			expected_sum = 6.0 - (position + 1)
+			if p1_health_sum != expected_sum:
+				print('ERROR: unexpected health sum. ' 
+					f'Expected {expected_sum} but had {p1_health_sum}')
