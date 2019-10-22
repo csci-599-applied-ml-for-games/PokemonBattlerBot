@@ -81,6 +81,8 @@ ACTIVE_STATE = increment_index()
 
 FAINTED_STATE = increment_index()
 
+NORMALIZED_HEALTH = increment_index()
+
 ATTRIBUTES_PER_POKEMON = INDEX_TRACKER + 1
 
 class GameState():
@@ -129,6 +131,31 @@ class GameState():
 				POKEMON_NAME_TO_INDEX['NotFound'])
 			self.vector_list[player * GameState.num_player_elements +
 				team_position * ATTRIBUTES_PER_POKEMON + pokemon_index] = 1.0
+
+	def _set_health(self, player, position, value):
+		self.vector_list[player * GameState.num_player_elements +
+			position * ATTRIBUTES_PER_POKEMON + NORMALIZED_HEALTH] = value
+
+	def set_health(self, player, name, value):
+		position = self.name_to_position[player][name]
+		self._set_health(player, position, value)
+
+	def init_health(self, player):
+		for team_position in range(self.max_team_size):
+			self._set_health(player, team_position, 1.0)
+
+	def check_health(self, player, name):
+		name = GameState.pokemon_name_clean(name)
+		position = self.name_to_position[player][name]
+		return (self.vector_list[player * GameState.num_player_elements +
+			position * ATTRIBUTES_PER_POKEMON + NORMALIZED_HEALTH])
+
+	def all_health(self, player):
+		health_list = []
+		team = self.name_to_position[player]
+		for name in team:
+			health_list.append((name, self.check_health(player, name)))
+		return health_list 
 
 	def check_team_position(self, player, position):
 		'''
@@ -203,6 +230,7 @@ class GameState():
 	def set_fainted(self, player, name):
 		team_position = self.name_to_position[player][name]
 		self._set_active(player, team_position, 0.0)
+		self._set_health(player, team_position, 0.0)
 		self._set_fainted(player, team_position, 1.0)
 
 	def check_fainted(self, player, name):
@@ -424,3 +452,31 @@ if __name__ == '__main__':
 			test_types(player, pokemon, type_names)
 		for pokemon, type_names in pokemon_types:
 			check_types(player, pokemon, type_names)
+
+	for player in GameState.Player:
+		if player == GameState.Player.count:
+			continue
+		expected_health = [
+			('Pelipper', 1.0),
+			('Greninja', 1.0),
+			('Swampert', 1.0),
+			('Manaphy', 1.0),
+			('Ferrothorn', 1.0),
+			('Tornadus', 1.0)
+		]
+		gs.init_health(player)
+		gs_health = gs.all_health(player)
+		if set(gs_health) != set(expected_health):
+			print(gs_health)
+			print('gs_health had unexpected values when testing init_health')
+
+		for (index, data) in enumerate(expected_health):
+			pokemon, _ = data
+			gs.set_health(player, pokemon, 0.0)
+			new_expected = [element for element in expected_health]
+			new_expected[index] = (pokemon, 0.0)
+			gs_health = gs.all_health(player)
+			if set(gs_health) != set(new_expected):
+				print(gs_health)
+				print('gs_health had unexpected values when testing set_health')
+			gs.set_health(player, pokemon, 1.0)
