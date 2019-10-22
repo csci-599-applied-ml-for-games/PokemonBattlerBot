@@ -33,7 +33,7 @@ from docopt import docopt
 
 import showdown 
 
-from gamestate import GameState
+from gamestate import GameState, health_sum, ko_count
 from dqn import DQNAgent, ActionType
 
 LOGS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
@@ -66,6 +66,56 @@ def hack_name(pokemon):
 		return 'Tornadus-Therian'
 	else:
 		return pokemon
+
+def calculate_reward(bot, last_state, current_state, health_change=1.0,
+	opp_health_change=-1.0, knock_out=-4.0, opp_knock_out=4.0):
+	'''
+	last_state: vector list from previous turn's gamestate
+	
+	current_state: vector list from current turn's gamestate
+	
+	health_change: float. default value 1.0. 
+	multiplied by sum of normalized health change for all of player's pokemon 
+	as a part of episode reward
+
+	opp_health_change: float. default value 1.0.
+	multiplied by sum of normalized health change for all of opponent's pokemon
+	as a part of episode reward
+
+	knock_out: float. default value -4.0.
+	multiplied by the number of player's pokemon which have been knocked out 
+	since last_state
+
+	knock_out_penalty: float. default value 4.0
+	multiplied by the number of opponent's pokemon which have been knocked out
+	since last_state 
+	'''
+	reward = 0
+	p1_health_change = (health_sum(current_state, GameState.Player.one) - 
+		health_sum(last_state, GameState.Player.one))
+	bot.log(f'p1_health_change: {p1_health_change}')
+	reward += health_change * p1_health_change
+	bot.log(f'reward is now {reward}')
+
+	p2_health_change = (health_sum(current_state, GameState.Player.two) - 
+		health_sum(last_state, GameState.Player.two))
+	bot.log(f'p2_health_change: {p2_health_change}')
+	reward += opp_health_change * p2_health_change
+	bot.log(f'reward is now {reward}')
+	
+	p1_ko_change = (ko_count(current_state, GameState.Player.one) - 
+		ko_count(last_state, GameState.Player.one))
+	bot.log(f'p1_ko_change: {p1_ko_change}')
+	reward += knock_out * p1_ko_change
+	bot.log(f'reward is now {reward}')
+
+	p2_ko_change = (ko_count(current_state, GameState.Player.two) - 
+		ko_count(last_state, GameState.Player.two))
+	bot.log(f'p2_ko_change: {p2_ko_change}')
+	reward += opp_knock_out * p2_ko_change
+	bot.log(f'reward is now {reward}')
+
+	return reward
 
 class BotClient(showdown.Client):
 	health_regex = re.compile(r'(?P<numerator>[0-9]+)/(?P<denominator>[0-9]+)')
@@ -318,17 +368,13 @@ class BotClient(showdown.Client):
 
 				if self.turn_number == 1:
 					self.state_vl = self.gs.vector_list
-					self.reward = 0
-					reward = self.reward
+					reward = 0
 				else:
-					#NOTE: this should be changed if using other reward functions besides win or lose the game
-					reward = self.reward
-					self.reward = 0
-					
 					last_state = [element for element in self.state_vl]
-					self.state_vl = self.gs.vector_list
+					self.state_vl = [element for element in self.gs.vector_list]
 					done = False
 
+					reward = calculate_reward(self, last_state, self.state_vl)
 					transition = (last_state, 
 						self.action, 
 						reward, 
@@ -336,9 +382,7 @@ class BotClient(showdown.Client):
 						done)
 					self.log(f'Updating replay memory with {transition}')
 					self.agent.update_replay_memory(transition)
-					self.log(f'Successfully updated replay memory')
 					self.agent.train(False)
-					self.log(f'Trained')
 				self.log(f'This transition\'s reward was {reward}')
 			elif inp_type == 'request':
 				json_string = params[0]
@@ -529,11 +573,11 @@ class BotClient(showdown.Client):
 				if winner == self.name:
 					self.wins += 1
 					self.log("We won")
-					reward = 10000 
+					reward = 104
 				else:
 					self.losses += 1
 					self.log("We lost")
-					reward = -10000
+					reward = -104
 
 				last_state = [element for element in self.state_vl]
 				self.state_vl = self.gs.vector_list
@@ -594,10 +638,8 @@ class BotClient(showdown.Client):
 				self.log(f'{player}\'s {pokemon} has fainted')
 				if player == self.position:
 					gs_player = GameState.Player.one
-					self.reward = -1
 				else:
 					gs_player = GameState.Player.two
-					self.reward = 1
 
 				self.gs.set_fainted(gs_player, pokemon)
 				self.log('set_fainted called successfully')
