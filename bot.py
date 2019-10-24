@@ -167,21 +167,22 @@ class BotClient(showdown.Client):
 	def get_pokemon(pokemon_data):
 		return pokemon_data.split(':')[1].strip()
 
-	def add_status(self, statuses, pokemon_name, status):
+	def add_status(self, statuses, player_name, pokemon_name, status):
 		pokemon_statuses = statuses.get(pokemon_name, [])
 		pokemon_statuses.append(status)
 		statuses[pokemon_name] = pokemon_statuses
-		
+		self.gs.set_status(player_name, pokemon_name, status)
+
 		self.log('Self Status', self.statuses)
 		self.log('Opp Status', self.opp_statuses)
 
-	def remove_status(self, statuses, pokemon_name, status):
+	def remove_status(self, statuses, player_name, pokemon_name, status):
 		pokemon_statuses = statuses.get(pokemon_name, [])
-		try:
+		if status in pokemon_statuses.keys():
 			pokemon_statuses.remove(status)
-		except ValueError:
-			pass
+		
 		statuses[pokemon_name] = pokemon_statuses
+		self.gs.remove_status(player_name, pokemon_name, status)
 
 		self.log('Self Status', self.statuses)
 		self.log('Opp Status', self.opp_statuses)
@@ -350,48 +351,40 @@ class BotClient(showdown.Client):
 				pokemon_name = self.get_pokemon(pokemon_data)
 				status = params[1]
 				if self.own_pokemon(pokemon_data):
-					self.add_status(self.statuses, pokemon_name, status)
-					self.gs.set_status(GameState.Player.one, pokemon_name, status)
+					self.add_status(self.statuses, GameState.Player.one,pokemon_name, status)
 
 				else:
-					self.add_status(self.opp_statuses, pokemon_name, status)
-					self.gs.set_status(GameState.Player.two, pokemon_name, status)
+					self.add_status(self.opp_statuses, GameState.Player.two, pokemon_name, status)
 
 			elif inp_type == '-start':
 				pokemon_data = params[0]
 				pokemon_name = self.get_pokemon(pokemon_data)
 				status = params[1]
 				if self.own_pokemon(pokemon_data):
-					self.add_status(self.statuses, pokemon_name, status)
-					self.gs.set_status(GameState.Player.one, pokemon_name, status)
+					self.add_status(self.statuses, GameState.Player.one, pokemon_name, status)
 
 				else:
-					self.add_status(self.opp_statuses, pokemon_name, status)
-					self.gs.set_status(GameState.Player.two, pokemon_name, status)
+					self.add_status(self.opp_statuses, GameState.Player.two, pokemon_name, status)
 
 			elif inp_type == '-end':
 				pokemon_data = params[0]
 				pokemon_name = self.get_pokemon(pokemon_data)
 				status = params[1]
 				if self.own_pokemon(pokemon_data):
-					self.remove_status(self.statuses, pokemon_name, status)
-					self.gs.remove_status(GameState.Player.one, pokemon_name, status)
+					self.remove_status(self.statuses, GameState.Player.one, pokemon_name, status)
 
 				else:
-					self.remove_status(self.opp_statuses, pokemon_name, status)
-					self.gs.remove_status(GameState.Player.two, pokemon_name, status)
+					self.remove_status(self.opp_statuses, GameState.Player.two, pokemon_name, status)
 
 			elif inp_type == '-curestatus':
 				pokemon_data = params[0]
 				pokemon_name = self.get_pokemon(pokemon_data)
 				status = params[1]
 				if self.own_pokemon(pokemon_data):
-					self.remove_status(self.statuses, pokemon_name, status)
-					self.gs.remove_status(GameState.Player.one, pokemon_name, status)
+					self.remove_status(self.statuses, GameState.Player.one, pokemon_name, status)
 
 				else:
-					self.remove_status(self.opp_statuses, pokemon_name, status)
-					self.gs.remove_status(GameState.Player.two, pokemon_name, status)
+					self.remove_status(self.opp_statuses, GameState.Player.two, pokemon_name, status)
 
 
 			elif inp_type == 'switch':
