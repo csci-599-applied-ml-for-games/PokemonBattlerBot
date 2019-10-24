@@ -35,6 +35,10 @@ class DQNAgent():
 	def __init__(self, input_shape, log_path=None, replay_memory_path=None, 
 		model_path=None, training=True, epsilon_decay=0.99):
 
+		self.current_epoch = 0
+		self.decay_iterations = 0
+		self.min_epsilon_iterations = 0
+
 		self.input_shape = input_shape
 
 		self.model = self.create_model()
@@ -42,6 +46,7 @@ class DQNAgent():
 		self.target_model = self.create_model()
 		self.target_model.set_weights(self.model.get_weights())
 
+		#TODO: don't initialize dequeue if not training
 		self.replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
 
 		self.epsilon = 1 
@@ -185,6 +190,10 @@ class DQNAgent():
 		if terminal_state:
 			self.target_update_counter += 1
 			self.decay_epsilon()
+			if self.epsilon > self.min_epsilon:
+				self.decay_iterations += 1
+			else:
+				self.min_epsilon_iterations += 1
 
 		if self.target_update_counter >= self.update_target_every:
 			self.log('Updating target model')
@@ -210,3 +219,21 @@ class DQNAgent():
 		string = '{} {}'.format(prefix, ' '.join(l))
 		with open(self.log_path, 'a') as fd:
 			fd.write(f'{string}\n')
+
+	def update_epoch(self):
+		self.log('update_epoch')
+		self.log(f'decay_iterations: {self.decay_iterations}')
+		self.log(f'min_epsilon_iterations: {self.min_epsilon_iterations}')
+		if (self.epsilon <= self.min_epsilon and 
+			self.decay_iterations <= self.min_epsilon_iterations):
+			
+			self.current_epoch += 1
+		self.log(f'current_epoch is now {self.current_epoch}')
+		return self.current_epoch
+
+	def restart_epoch(self):
+		self.log('restart epoch')
+		self.replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
+		self.decay_iterations = 0
+		self.min_epsilon_iterations = 0
+		self.epsilon = 1
