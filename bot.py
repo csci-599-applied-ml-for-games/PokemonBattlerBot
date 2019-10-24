@@ -270,26 +270,12 @@ class BotClient(showdown.Client):
 	def get_pokemon(pokemon_data):
 		return pokemon_data.split(':')[1].strip()
 
-	def add_status(self, statuses, player_name, pokemon_name, status):
-		pokemon_statuses = statuses.get(pokemon_name, [])
-		pokemon_statuses.append(status)
-		statuses[pokemon_name] = pokemon_statuses
+	def add_status(self, player_name, pokemon_name, status):
 		self.gs.set_status(player_name, pokemon_name, status)
 
-		self.log('Self Status', self.statuses)
-		self.log('Opp Status', self.opp_statuses)
-
-	def remove_status(self, statuses, player_name, pokemon_name, status):
-		pokemon_statuses = statuses.get(pokemon_name, [])
-		if status in pokemon_statuses.keys():
-			pokemon_statuses.remove(status)
-		
-		statuses[pokemon_name] = pokemon_statuses
+	def remove_status(self, player_name, pokemon_name, status):
 		self.gs.remove_status(player_name, pokemon_name, status)
-
-		self.log('Self Status', self.statuses)
-		self.log('Opp Status', self.opp_statuses)
-
+		
 	async def challenge_expected(self):
 		self.log("Challenging {}".format(self.expected_opponent))
 		await self.cancel_challenge()
@@ -378,6 +364,9 @@ class BotClient(showdown.Client):
 
 				self.log(f'P1 fainted: {self.gs.all_fainted(GameState.Player.one)}')
 				self.log(f'P2 fainted: {self.gs.all_fainted(GameState.Player.two)}')
+
+				self.log(f'P1 statuses: {self.gs.all_statuses(GameState.Player.one)}')
+				self.log(f'P2 statuses: {self.gs.all_statuses(GameState.Player.two)}')
 
 				if self.turn_number == 1:
 					self.state_vl = self.gs.vector_list
@@ -471,41 +460,44 @@ class BotClient(showdown.Client):
 				pokemon_name = self.get_pokemon(pokemon_data)
 				status = params[1]
 				if self.own_pokemon(pokemon_data):
-					self.add_status(self.statuses, GameState.Player.one,pokemon_name, status)
+					self.add_status(GameState.Player.one, pokemon_name, status)
 
 				else:
-					self.add_status(self.opp_statuses, GameState.Player.two, pokemon_name, status)
+					self.add_status(GameState.Player.two, pokemon_name, status)
 
 			elif inp_type == '-start':
 				pokemon_data = params[0]
 				pokemon_name = self.get_pokemon(pokemon_data)
 				status = params[1]
 				if self.own_pokemon(pokemon_data):
-					self.add_status(self.statuses, GameState.Player.one, pokemon_name, status)
+					self.add_status(GameState.Player.one, pokemon_name, status)
 
 				else:
-					self.add_status(self.opp_statuses, GameState.Player.two, pokemon_name, status)
+					self.add_status(GameState.Player.two, pokemon_name, status)
 
 			elif inp_type == '-end':
 				pokemon_data = params[0]
 				pokemon_name = self.get_pokemon(pokemon_data)
 				status = params[1]
 				if self.own_pokemon(pokemon_data):
-					self.remove_status(self.statuses, GameState.Player.one, pokemon_name, status)
+					self.remove_status(GameState.Player.one, pokemon_name, 
+						status)
 
 				else:
-					self.remove_status(self.opp_statuses, GameState.Player.two, pokemon_name, status)
+					self.remove_status(GameState.Player.two, pokemon_name, 
+						status)
 
 			elif inp_type == '-curestatus':
 				pokemon_data = params[0]
 				pokemon_name = self.get_pokemon(pokemon_data)
 				status = params[1]
 				if self.own_pokemon(pokemon_data):
-					self.remove_status(self.statuses, GameState.Player.one, pokemon_name, status)
+					self.remove_status(GameState.Player.one, pokemon_name, 
+						status)
 
 				else:
-					self.remove_status(self.opp_statuses, GameState.Player.two, pokemon_name, status)
-
+					self.remove_status(GameState.Player.two, pokemon_name, 
+						status)
 
 			elif inp_type == 'switch':
 				name_with_owner = params[0]
@@ -515,12 +507,14 @@ class BotClient(showdown.Client):
 				volatile_statuses = ['confusion', 'curse']
 				if my_pokemon:
 					pokemon_name = self.active_pokemon
-					statuses = self.statuses
+					gs_player = GameState.Player.one
 				else:
 					pokemon_name = self.opp_active_pokemon
-					statuses = self.opp_statuses
-				for volatile_status in volatile_statuses:
-					self.remove_status(statuses, pokemon_name, volatile_status)
+					gs_player = GameState.Player.two
+				if pokemon_name != None:
+					for volatile_status in volatile_statuses:
+						self.remove_status(gs_player, pokemon_name, 
+							volatile_status)
 
 				new_active_name = GameState.pokemon_name_clean(name_with_details)
 				if not my_pokemon:
@@ -791,11 +785,9 @@ class BotClient(showdown.Client):
 		if room_obj.id.startswith('battle-'):
 			self.log(f'Room ID: {room_obj.id}')
 			self.active_pokemon = None
-			self.statuses = {}
 			self.sidestart = []
 
 			self.opp_active_pokemon = None
-			self.opp_statuses = {}
 			self.opp_sidestart = []
 
 			self.weather = 'none'

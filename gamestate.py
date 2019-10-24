@@ -383,6 +383,13 @@ class GameState():
 					start_of_status_indices])
 		return statuses
 
+	def all_statuses(self, player):
+		statuses = []
+		team = self.name_to_position[player]
+		for name in team:
+			statuses.append((name, self.check_status(player, name)))
+		return statuses
+
 	def update_abilities(self, player, pokemon, ability):
 		#TODO: replace implementation with packing into vector list
 		pokemon_name = GameState.pokemon_name_clean(str(pokemon))
