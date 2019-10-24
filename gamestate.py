@@ -451,19 +451,10 @@ if __name__ == '__main__':
 			gs.set_type(player, pokemon, type_name)
 		check_types(player, pokemon, type_names)
 	
-	def check_statuses(player, pokemon, status_names):
-		has_types = gs.check_status(player, pokemon)
-		if set(has_types) != set(status_names):
-			print(f'{pokemon} has types {has_types} instead of {status_names}')
-
-	def test_statuses(player, pokemon, status_names):
-		for status_name in status_names:
-			gs.set_status(player, pokemon, status_name)
-		check_statuses(player, pokemon, status_names)
-
 	for player in GameState.Player:
 		if player == GameState.Player.count:
 			continue
+
 		pokemon_types = [
 			('Pelipper', ['Water', 'Flying']),
 			('Greninja', ['Water', 'Dark']),
@@ -476,3 +467,31 @@ if __name__ == '__main__':
 			test_types(player, pokemon, type_names)
 		for pokemon, type_names in pokemon_types:
 			check_types(player, pokemon, type_names)	
+	
+	def check_statuses(player, pokemon, status_names):
+		has_statuses = gs.check_status(player, pokemon)
+		if set(has_statuses) != set(status_names):
+			print(f'{pokemon} has types {has_statuses} instead of {status_names}')
+
+	def test_statuses(player, pokemon, status_names):
+		for status_name in status_names:
+			gs.set_status(player, pokemon, status_name)
+		check_statuses(player, pokemon, status_names)
+	
+	for player in GameState.Player:
+		if player == GameState.Player.count:
+			continue
+		
+		#Note: just a test input, such a combination of statuses is unlikely
+		pokemon_statuses = [
+			('Pelipper', ['brn', 'par', 'slp', 'frz', 'psn', 'tox']),
+			('Greninja', ['confusion', 'flinch', 'trapped', 'trapper']),
+			('Swampert', ['partiallytrapped', 'lockedmove', 'twoturnmove', 'choicelock']),
+			('Manaphy', ['mustrecharge', 'futuremove', 'healreplacement', 'stall', 'gem']),
+			('Ferrothorn', ['raindance', 'primordialsea', 'sunnyday', 'desolateland']),
+			('Tornadus', ['sandstorm', 'hail', 'deltastream', 'arceus', 'silvally'])
+		]
+		for pokemon, status_names in pokemon_statuses:
+			test_statuses(player, pokemon, status_names)
+		for pokemon, status_names in pokemon_statuses:
+			check_statuses(player, pokemon, status_names)
