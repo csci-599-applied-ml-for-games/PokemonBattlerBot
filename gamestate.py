@@ -606,6 +606,7 @@ if __name__ == '__main__':
 				print(f'ERROR: expected {expected_ko_count} KOs but had '
 					f'{player_ko_count}')
 
+
 	def check_statuses(player, pokemon, status_names):
 		has_statuses = gs.check_status(player, pokemon)
 		if set(has_statuses) != set(status_names):
