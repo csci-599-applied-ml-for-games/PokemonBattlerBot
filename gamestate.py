@@ -131,6 +131,19 @@ STATUS_NAME_TO_INDEX = {
 }
 _, INDEX_TO_STATUS_NAME = attribute_dict_setup(STATUS_NAME_TO_INDEX)
 
+BOOST_NAME_TO_INDEX = {
+	'atk': increment_index(),
+	'def': increment_index(),
+	'spa': increment_index(),
+	'spd': increment_index(),
+	'spe': increment_index(),
+	'accuracy': increment_index(),
+	'evasion': increment_index()
+}
+_, INDEX_TO_BOOST_NAME = attribute_dict_setup(BOOST_NAME_TO_INDEX)
+MAX_BOOST = 6.0
+MIN_BOOST = -6.0
+
 ACTIVE_STATE = increment_index()
 
 FAINTED_STATE = increment_index()
@@ -154,6 +167,57 @@ def ko_count(vector_list, player):
 			player * GameState.num_player_elements +
 			position * ATTRIBUTES_PER_POKEMON + FAINTED_STATE]
 	return total
+
+def check_reset_boost(gs, player):
+	all_boosts = gs.all_boosts(player)
+	for pokemon_name_check in all_boosts:
+		pokemon_boosts = all_boosts[pokemon_name_check]
+		for boost_name_check, boost_value in pokemon_boosts:
+			if boost_value != 0.5:
+				print(f'ERROR in player{player} reset_boost')
+				print('ERROR: unexpected boost value '
+					f'{pokemon_name_check}, {boost_name_check}, {boost_value} '
+					'expected 0.5')
+
+def check_add_boost(gs, player, pokemon_name, boost_name):
+	all_boosts = gs.all_boosts(player)
+	for pokemon_name_check in all_boosts:
+		pokemon_boosts = all_boosts[pokemon_name_check]
+		for boost_name_check, boost_value in pokemon_boosts:
+			if (pokemon_name_check == pokemon_name and 
+				boost_name_check == boost_name):
+
+				if boost_value != 1.0:
+					print(f'ERROR in player{player}, add_boost {pokemon_name}')
+					print('ERROR: unexpected boost value '
+						f'{pokemon_name_check}, {boost_name_check}, {boost_value} '
+						'expected 1.0')
+			else:
+				if boost_value != 0.5:
+					print(f'ERROR in player{player} add_boost {pokemon_name}')
+					print('ERROR: unexpected boost value '
+						f'{pokemon_name_check}, {boost_name_check}, {boost_value} '
+						'expected 0.5')
+
+def check_add_unboost(gs, player, pokemon_name, boost_name):
+	all_boosts = gs.all_boosts(player)
+	for pokemon_name_check in all_boosts:
+		pokemon_boosts = all_boosts[pokemon_name_check]
+		for boost_name_check, boost_value in pokemon_boosts:
+			if (pokemon_name_check == pokemon_name and 
+				boost_name_check == boost_name):
+
+				if boost_value != 0.0:
+					print(f'ERROR in player{player}, add_unboost {pokemon_name}')
+					print('ERROR: unexpected boost value '
+						f'{pokemon_name_check}, {boost_name_check}, {boost_value} '
+						'expected 1.0')
+			else:
+				if boost_value != 0.5:
+					print(f'ERROR in player{player}, add_unboost {pokemon_name}')
+					print('ERROR: unexpected boost value '
+						f'{pokemon_name_check}, {boost_name_check}, {boost_value} '
+						'expected 0.5')
 
 class GameState():
 	class Player(IntEnum):
@@ -258,6 +322,62 @@ class GameState():
 		for name in team:
 			health_list.append((name, self.check_health(player, name)))
 		return health_list 
+
+	def _set_boost(self, player, team_position, boost_position, value):
+		self.vector_list[SHARED_ATTRIBUTES_COUNT + 
+			player * GameState.num_player_elements +
+			team_position * ATTRIBUTES_PER_POKEMON + boost_position] = value
+
+	def set_boost(self, player, pokemon_name, boost_name, value):
+		team_position = self.name_to_position[player][pokemon_name]
+		boost_position = BOOST_NAME_TO_INDEX[boost_name]
+		self._set_boost(player, team_position, boost_position, value)
+
+	def get_boost(self, player, pokemon_name, boost_name):
+		team_position = self.name_to_position[player][pokemon_name]
+		boost_position = BOOST_NAME_TO_INDEX[boost_name]
+		return self.vector_list[SHARED_ATTRIBUTES_COUNT + 
+			player * GameState.num_player_elements +
+			team_position * ATTRIBUTES_PER_POKEMON + boost_position]		
+
+	def add_boost(self, player, pokemon_name, boost_name, delta):
+		normalized_delta = float(delta) / MAX_BOOST
+		current_boost = self.get_boost(player, pokemon_name, boost_name)
+		value = current_boost + normalized_delta
+		if value > 1.0:
+			value = 1.0
+		self.set_boost(player, pokemon_name, boost_name, value)
+
+	def add_unboost(self, player, pokemon_name, boost_name, delta):
+		normalized_delta = float(delta) / abs(MIN_BOOST)
+		current_boost = self.get_boost(player, pokemon_name, boost_name)
+		value = current_boost - normalized_delta
+		if value < 0.0:
+			value = 0.0
+		self.set_boost(player, pokemon_name, boost_name, value)
+
+	def reset_boost(self, player, pokemon_name):
+		team_position = self.name_to_position[player][pokemon_name]
+		for boost_position in INDEX_TO_BOOST_NAME:
+			self._set_boost(player, team_position, boost_position, 0.5)
+
+	def init_boost(self, player):
+		for team_position in range(len(self.name_to_position[player])):
+			for boost_position in INDEX_TO_BOOST_NAME:
+				self._set_boost(player, team_position, boost_position, 0.5)
+
+	def all_boosts(self, player):
+		boosts = {}
+		team = self.name_to_position[player]
+		for name in team:
+			pokemon_boosts = []
+			for boost_name in BOOST_NAME_TO_INDEX:
+				if boost_name == 'Min' or boost_name == 'Count':
+					continue
+				boost = self.get_boost(player, name, boost_name)
+				pokemon_boosts.append((boost_name, boost))
+			boosts[name] = pokemon_boosts
+		return boosts
 
 	def check_team_position(self, player, position):
 		'''
@@ -721,3 +841,37 @@ if __name__ == '__main__':
 	weathers = gs.all_weather()
 	if weathers != []:
 		print(f'Weathers was {weathers} instead of []')
+
+	for player in GameState.Player:
+		if player == GameState.Player.count:
+			continue
+		
+		gs.init_boost(player)
+		check_reset_boost(gs, player)
+
+		if player == GameState.Player.one:
+			team = team1
+		else:
+			team = team2
+
+		for pokemon_name in team:
+			for boost_name in BOOST_NAME_TO_INDEX:
+				if boost_name == 'Min' or boost_name == 'Count':
+					continue
+				gs.add_boost(player, pokemon_name, boost_name, 3)
+				check_add_boost(gs, player, pokemon_name, boost_name)
+
+				gs.reset_boost(player, pokemon_name)
+				check_reset_boost(gs, player)
+
+				gs.add_unboost(player, pokemon_name, boost_name, 3)				
+				check_add_unboost(gs, player, pokemon_name, boost_name)
+				gs.reset_boost(player, pokemon_name)
+				check_reset_boost(gs, player)
+
+				gs.add_unboost(player, pokemon_name, boost_name, 3)
+				check_add_unboost(gs, player, pokemon_name, boost_name)
+				gs.add_boost(player, pokemon_name, boost_name, 6)
+				check_add_boost(gs, player, pokemon_name, boost_name)				
+				gs.reset_boost(player, pokemon_name)
+				check_reset_boost(gs, player)
