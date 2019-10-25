@@ -349,6 +349,8 @@ class BotClient(showdown.Client):
 			elif inp_type == 'turn':
 				self.turn_number = int(params[0])
 				
+				self.log(f'Weather: {self.gs.all_weather()}')
+
 				active_pokemon = self.gs.all_active(GameState.Player.one)
 				self.log(f'P1 active: {active_pokemon}')
 				if len(active_pokemon) > 1:
@@ -537,10 +539,6 @@ class BotClient(showdown.Client):
 						
 						self.log(f'WARNING: {self.active_pokemon}'
 							' was not active as expected')
-
-			elif inp_type == 'weather':
-				self.weather = params[0]
-				self.log('New weather: {}'.format(self.weather))
 
 			elif inp_type == '-sidestart':
 				position = params[0].split(':')[0]
@@ -750,7 +748,11 @@ class BotClient(showdown.Client):
 					self.z_power = True
 
 			elif inp_type == '-weather':
-				self.log('weather', params)
+				weather_name = params[0]
+				if weather_name == 'none':
+					self.gs.clear_all_weather()
+				else:
+					self.gs.set_weather(weather_name)
 		else:
 			if inp_type == 'updateuser':
 				if (self.name == params[0].strip() and self.challenge and 
