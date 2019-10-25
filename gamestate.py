@@ -10,12 +10,33 @@ def increment_index():
 	INDEX_TRACKER += 1
 	return INDEX_TRACKER
 
+SHARED_INDEX_TRACKER = 0
+def increment_shared_index():
+	global SHARED_INDEX_TRACKER
+	SHARED_INDEX_TRACKER += 1
+	return SHARED_INDEX_TRACKER
+
 def attribute_dict_setup(attribute_dict):
 	reversed_dict = {v: k for k, v in attribute_dict.items()}
 	our_min = min([v for k, v in attribute_dict.items()])
 	attribute_dict['Count'] = len(attribute_dict)
 	attribute_dict['Min'] = our_min
 	return attribute_dict, reversed_dict 
+
+WEATHER_NAME_TO_INDEX = {
+	'RainDance': increment_shared_index(),
+	'PrimordialSea': increment_shared_index(),
+	'SunnyDay': increment_shared_index(),
+	'DesolateLand': increment_shared_index(),
+	'Sandstorm': increment_shared_index(),
+	'Hail': increment_shared_index(),
+	'DeltaStream': increment_shared_index(),
+	'NotFound': increment_shared_index()
+}
+
+_, INDEX_TO_WEATHER_NAME = attribute_dict_setup(WEATHER_NAME_TO_INDEX)
+
+SHARED_ATTRIBUTES_COUNT = SHARED_INDEX_TRACKER + 1
 
 POKEMON_NAME_TO_INDEX = {
 	'Pelipper': INDEX_TRACKER,
@@ -121,14 +142,16 @@ ATTRIBUTES_PER_POKEMON = INDEX_TRACKER + 1
 def health_sum(vector_list, player):
 	total = 0
 	for position in range(GameState.max_team_size):
-		total += vector_list[player * GameState.num_player_elements +
+		total += vector_list[SHARED_ATTRIBUTES_COUNT + 
+			player * GameState.num_player_elements +
 			position * ATTRIBUTES_PER_POKEMON + NORMALIZED_HEALTH]
 	return total
 
 def ko_count(vector_list, player):
 	total = 0
 	for position in range(GameState.max_team_size):
-		total += vector_list[player * GameState.num_player_elements +
+		total += vector_list[SHARED_ATTRIBUTES_COUNT + 
+			player * GameState.num_player_elements +
 			position * ATTRIBUTES_PER_POKEMON + FAINTED_STATE]
 	return total
 
@@ -144,7 +167,8 @@ class GameState():
 
 	max_team_size = 6
 
-	num_player_elements = max_team_size * ATTRIBUTES_PER_POKEMON
+	num_player_elements = (SHARED_ATTRIBUTES_COUNT + 
+		max_team_size * ATTRIBUTES_PER_POKEMON)
 
 	@staticmethod
 	def vector_dimension():
@@ -157,6 +181,34 @@ class GameState():
 		self.name_to_position = [{}, {}] 
 		self.team_abilities = [{}, {}] #TODO: remove and pack in vector_list
 		self.team_mega = [{}, {}]
+
+	def _set_weather(self, weather_name, value):
+		position = WEATHER_NAME_TO_INDEX.get(weather_name, 
+			WEATHER_NAME_TO_INDEX['NotFound'])
+		self.vector_list[position] = value
+
+	def set_weather(self, weather_name):
+		self.clear_all_weather()
+		self._set_weather(weather_name, 1.0)
+
+	def clear_all_weather(self):
+		for weather_name in WEATHER_NAME_TO_INDEX:
+			self._set_weather(weather_name, 0.0)
+
+	def clear_weather(self, weather_name):
+		self.vector_list[WEATHER_NAME_TO_INDEX[weather_name]] = 0.0
+
+	def check_weather(self, weather_name):
+		return self.vector_list[WEATHER_NAME_TO_INDEX[weather_name]] == 1.0
+
+	def all_weather(self):
+		weathers = []
+		for weather_name in WEATHER_NAME_TO_INDEX:
+			if weather_name == 'Min' or weather_name == 'Count':
+				continue
+			if self.check_weather(weather_name):
+				weathers.append(weather_name)
+		return weathers
 
 	@staticmethod
 	def pokemon_name_clean(pokemon_name):
@@ -176,11 +228,13 @@ class GameState():
 
 			pokemon_index = POKEMON_NAME_TO_INDEX.get(pokemon_name, 
 				POKEMON_NAME_TO_INDEX['NotFound'])
-			self.vector_list[player * GameState.num_player_elements +
+			self.vector_list[SHARED_ATTRIBUTES_COUNT + 
+				player * GameState.num_player_elements +
 				team_position * ATTRIBUTES_PER_POKEMON + pokemon_index] = 1.0
 
 	def _set_health(self, player, position, value):
-		self.vector_list[player * GameState.num_player_elements +
+		self.vector_list[SHARED_ATTRIBUTES_COUNT + 
+			player * GameState.num_player_elements +
 			position * ATTRIBUTES_PER_POKEMON + NORMALIZED_HEALTH] = value
 
 	def set_health(self, player, name, value):
@@ -194,7 +248,8 @@ class GameState():
 	def check_health(self, player, name):
 		name = GameState.pokemon_name_clean(name)
 		position = self.name_to_position[player][name]
-		return (self.vector_list[player * GameState.num_player_elements +
+		return (self.vector_list[SHARED_ATTRIBUTES_COUNT + 
+			player * GameState.num_player_elements +
 			position * ATTRIBUTES_PER_POKEMON + NORMALIZED_HEALTH])
 
 	def all_health(self, player):
@@ -212,7 +267,8 @@ class GameState():
 		player: member of Player enum
 		position: the position that the pokemon takes on the team. zero-indexed
 		'''
-		start_checking = (player * GameState.num_player_elements + 
+		start_checking = (SHARED_ATTRIBUTES_COUNT + 
+			player * GameState.num_player_elements + 
 			position * ATTRIBUTES_PER_POKEMON)
 		end_checking = start_checking + POKEMON_NAME_TO_INDEX['Count']
 		for pokemon_index in range(start_checking, end_checking):
@@ -231,7 +287,8 @@ class GameState():
 		position: the position that the pokemon takes on the team. zero-indexed
 		value: float for value
 		'''
-		self.vector_list[player * GameState.num_player_elements +
+		self.vector_list[SHARED_ATTRIBUTES_COUNT + 
+			player * GameState.num_player_elements +
 			position * ATTRIBUTES_PER_POKEMON + ACTIVE_STATE] = value
 
 	def set_active(self, player, name):
@@ -259,7 +316,8 @@ class GameState():
 		'''
 		name = GameState.pokemon_name_clean(name)
 		position = self.name_to_position[player][name]
-		return (self.vector_list[player * GameState.num_player_elements +
+		return (self.vector_list[SHARED_ATTRIBUTES_COUNT + 
+			player * GameState.num_player_elements +
 			position * ATTRIBUTES_PER_POKEMON + ACTIVE_STATE] == 1.0)
 
 	def all_active(self, player):
@@ -271,7 +329,8 @@ class GameState():
 		return active_pokemon
 
 	def _set_fainted(self, player, position, value):
-		self.vector_list[player * GameState.num_player_elements +
+		self.vector_list[SHARED_ATTRIBUTES_COUNT + 
+			player * GameState.num_player_elements +
 			position * ATTRIBUTES_PER_POKEMON + FAINTED_STATE] = value
 
 	def set_fainted(self, player, name):
@@ -283,7 +342,8 @@ class GameState():
 	def check_fainted(self, player, name):
 		name = GameState.pokemon_name_clean(name)
 		position = self.name_to_position[player][name]
-		return (self.vector_list[player * GameState.num_player_elements +
+		return (self.vector_list[SHARED_ATTRIBUTES_COUNT + 
+			player * GameState.num_player_elements +
 			position * ATTRIBUTES_PER_POKEMON + FAINTED_STATE] == 1.0)
 
 	def all_fainted(self, player):
@@ -298,7 +358,8 @@ class GameState():
 		return fainted
 
 	def _set_move(self, player, position, move_position, value):
-		self.vector_list[player * GameState.num_player_elements +
+		self.vector_list[SHARED_ATTRIBUTES_COUNT + 
+			player * GameState.num_player_elements +
 			position * ATTRIBUTES_PER_POKEMON + move_position] = value
 
 	def set_move(self, player, name, move_name):
@@ -310,11 +371,13 @@ class GameState():
 		name = GameState.pokemon_name_clean(name)
 		moves = []
 		position = self.name_to_position[player][name]
-		start_checking = (player * GameState.num_player_elements +
+		start_checking = (SHARED_ATTRIBUTES_COUNT + 
+			player * GameState.num_player_elements +
 			position * ATTRIBUTES_PER_POKEMON + MOVE_NAME_TO_INDEX['Min'])
 		end_checking = start_checking + MOVE_NAME_TO_INDEX['Count']
 		
-		start_of_move_indices = (player * GameState.num_player_elements +
+		start_of_move_indices = (SHARED_ATTRIBUTES_COUNT + 
+			player * GameState.num_player_elements +
 			position * ATTRIBUTES_PER_POKEMON)
 		for move_index in range(start_checking, end_checking):
 			if self.vector_list[move_index] == 1.0:
@@ -323,7 +386,8 @@ class GameState():
 		return moves
 
 	def _set_type(self, player, position, type_position, value):
-		self.vector_list[player * GameState.num_player_elements +
+		self.vector_list[SHARED_ATTRIBUTES_COUNT + 
+			player * GameState.num_player_elements +
 			position * ATTRIBUTES_PER_POKEMON + type_position] = value
 
 	def set_type(self, player, name, type_name):
@@ -339,11 +403,13 @@ class GameState():
 		name = GameState.pokemon_name_clean(name)
 		types = []
 		position = self.name_to_position[player][name]
-		start_checking = (player * GameState.num_player_elements +
+		start_checking = (SHARED_ATTRIBUTES_COUNT + 
+			player * GameState.num_player_elements +
 			position * ATTRIBUTES_PER_POKEMON + TYPE_NAME_TO_INDEX['Min'])
 		end_checking = start_checking + TYPE_NAME_TO_INDEX['Count']
 		
-		start_of_type_indices = (player * GameState.num_player_elements +
+		start_of_type_indices = (SHARED_ATTRIBUTES_COUNT + 
+			player * GameState.num_player_elements +
 			position * ATTRIBUTES_PER_POKEMON)
 		
 		for type_index in range(start_checking, end_checking):
@@ -353,7 +419,8 @@ class GameState():
 		return types
 	
 	def _set_status(self, player, team_position, status_position, value):
-		self.vector_list[player * GameState.num_player_elements + 
+		self.vector_list[SHARED_ATTRIBUTES_COUNT + 
+			player * GameState.num_player_elements + 
 			team_position * ATTRIBUTES_PER_POKEMON + status_position] = value
 
 	def set_status(self, player, name, status_name):
@@ -370,11 +437,13 @@ class GameState():
 		name = GameState.pokemon_name_clean(name)
 		statuses = []
 		position = self.name_to_position[player][name]
-		start_checking = (player * GameState.num_player_elements +
+		start_checking = (SHARED_ATTRIBUTES_COUNT + 
+			player * GameState.num_player_elements +
 			position * ATTRIBUTES_PER_POKEMON + STATUS_NAME_TO_INDEX['Min'])
 		end_checking = start_checking + STATUS_NAME_TO_INDEX['Count']
 		
-		start_of_status_indices = (player * GameState.num_player_elements +
+		start_of_status_indices = (SHARED_ATTRIBUTES_COUNT + 
+			player * GameState.num_player_elements +
 			position * ATTRIBUTES_PER_POKEMON)
 		
 		for status_index in range(start_checking, end_checking):
@@ -572,7 +641,7 @@ if __name__ == '__main__':
 		gs.init_health(player)
 		player_health_sum = health_sum(gs.vector_list, player)
 		if player_health_sum != 6.0:
-			print('ERROR: unexpected health sum after init')
+			print(f'ERROR: unexpected health sum {player_health_sum} after init')
 		for position in range(len(gs.name_to_position[player])):
 			gs._set_health(player, position, 0.0)
 
@@ -634,3 +703,21 @@ if __name__ == '__main__':
 			test_statuses(player, pokemon, status_names)
 		for pokemon, status_names in pokemon_statuses:
 			check_statuses(player, pokemon, status_names)
+
+	weathers = gs.all_weather()
+	if weathers != []:
+		print(f'Weathers was {weathers} instead of []')
+	gs.set_weather('RainDance')
+	weathers = gs.all_weather()
+	if len(weathers) > 1 or 'RainDance' not in weathers:
+		print(f'Weathers was {weathers} not [\'RainDance\']')
+
+	gs.set_weather('SunnyDay')
+	weathers = gs.all_weather()
+	if len(weathers) > 1 or 'SunnyDay' not in weathers:
+		print(f'Weathers was {weathers} not [\'SunnyDay\']')
+
+	gs.clear_all_weather()
+	weathers = gs.all_weather()
+	if weathers != []:
+		print(f'Weathers was {weathers} instead of []')
