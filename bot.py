@@ -1,6 +1,6 @@
 '''
 Usage:
-	bot.py <username> <password> <expected_opponent> [--iterations=<iterations>] [--challenge] [--modeltype=<modeltype>] [--load_model=<model_path>] [--epsilondecay=<epsilondecay>] [--notraining] [--printstats]
+	bot.py <username> <password> <expected_opponent> [--forever|--iterations=<iterations>|--epochs=<epochs>] [--challenge] [--modeltype=<modeltype>] [--load_model=<model_path>] [--epsilondecay=<epsilondecay>] [--notraining|--trainer] [--printstats]
 
 Arguments:
 	<username> 			Username for the client
@@ -10,9 +10,12 @@ Arguments:
 	<epsilondecay>		The decay rate for epsilon 
 	<model_path> 		Path to a model to load into DQN agent 
 Options:
-	--iterations 		The number of iterations to play against the opponent
+	--epochs			The number of epochs to train for 
+	--iterations 		The number of iterations to play against the opponent. 
+	--forever			Run until someone kills the process 
 	--challenge 		Challenge the expected_opponent when not playing a game
 	--notraining		Just run with the model. No training
+	--trainer  			If acting as a trainer for another process
 	--printstats 		Prints the win/loss rate of this process 
 '''
 
@@ -24,19 +27,23 @@ import csv
 import time
 import util
 from datetime import datetime
+from enum import Enum, auto
+import re
 
 from docopt import docopt 
 
 import showdown 
 
-from gamestate import GameState
+from gamestate import GameState, health_sum, ko_count
 from dqn import DQNAgent, ActionType
 
 LOGS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
 BOT_DIR = os.path.dirname(__file__)
 TYPE_MAP = {}
 
-class RandomModel():
+INPUT_SHAPE = (GameState.vector_dimension(),)
+		
+class RandomAgent():
 	def __init__(self):
 		pass
 
@@ -48,13 +55,76 @@ class RandomModel():
 		pass
 
 	def train(*args, **kwargs):
-		pass
+		return False
+
+class RunType(Enum):
+	Iterations = auto()
+	Epochs = auto()
+	Forever = auto()
+
+def hack_name(pokemon):
+	if pokemon == 'Tornadus': 
+		return 'Tornadus-Therian'
+	else:
+		return pokemon
+
+def calculate_reward(bot, last_state, current_state, health_change=1.0,
+	opp_health_change=-1.0, knock_out=-4.0, opp_knock_out=4.0):
+	'''
+	last_state: vector list from previous turn's gamestate
+	
+	current_state: vector list from current turn's gamestate
+	
+	health_change: float. default value 1.0. 
+	multiplied by sum of normalized health change for all of player's pokemon 
+	as a part of episode reward
+
+	opp_health_change: float. default value 1.0.
+	multiplied by sum of normalized health change for all of opponent's pokemon
+	as a part of episode reward
+
+	knock_out: float. default value -4.0.
+	multiplied by the number of player's pokemon which have been knocked out 
+	since last_state
+
+	knock_out_penalty: float. default value 4.0
+	multiplied by the number of opponent's pokemon which have been knocked out
+	since last_state 
+	'''
+	reward = 0
+	p1_health_change = (health_sum(current_state, GameState.Player.one) - 
+		health_sum(last_state, GameState.Player.one))
+	bot.log(f'p1_health_change: {p1_health_change}')
+	reward += health_change * p1_health_change
+	bot.log(f'reward is now {reward}')
+
+	p2_health_change = (health_sum(current_state, GameState.Player.two) - 
+		health_sum(last_state, GameState.Player.two))
+	bot.log(f'p2_health_change: {p2_health_change}')
+	reward += opp_health_change * p2_health_change
+	bot.log(f'reward is now {reward}')
+	
+	p1_ko_change = (ko_count(current_state, GameState.Player.one) - 
+		ko_count(last_state, GameState.Player.one))
+	bot.log(f'p1_ko_change: {p1_ko_change}')
+	reward += knock_out * p1_ko_change
+	bot.log(f'reward is now {reward}')
+
+	p2_ko_change = (ko_count(current_state, GameState.Player.two) - 
+		ko_count(last_state, GameState.Player.two))
+	bot.log(f'p2_ko_change: {p2_ko_change}')
+	reward += opp_knock_out * p2_ko_change
+	bot.log(f'reward is now {reward}')
+
+	return reward
 
 class BotClient(showdown.Client):
+	health_regex = re.compile(r'(?P<numerator>[0-9]+)/(?P<denominator>[0-9]+)')
+
 	def __init__(self, name='', password='', loop=None, max_room_logs=5000,
 		server_id='showdown', server_host=None, expected_opponent=None,
-		team=None, challenge=False, iterations=1, agent=None, 
-		print_stats=False):
+		team=None, challenge=False, runType=RunType.Iterations, runTypeData=1,
+		agent=None, print_stats=False, trainer=False):
 
 		if expected_opponent == None:
 			raise Exception("No expected opponent found in arguments")
@@ -66,10 +136,15 @@ class BotClient(showdown.Client):
 			self.team_text = team
 
 		self.iterations_run = 0
-		self.iterations = iterations 
+
+		self.runType = runType 
+		if self.runType == RunType.Iterations:
+			self.iterations = runTypeData 
+		elif self.runType == RunType.Epochs:
+			self.epochs = runTypeData
 
 		if agent == None:
-			self.agent = RandomModel()
+			self.agent = RandomAgent()
 		else:
 			self.agent = agent
 		self.state_vl = None
@@ -88,6 +163,8 @@ class BotClient(showdown.Client):
 		self.losses = 0
 		self.print_stats = print_stats
 
+		self.trainer = trainer
+
 		super().__init__(name=name, password=password, loop=loop, 
 			max_room_logs=max_room_logs, server_id=server_id, 
 			server_host=server_host)
@@ -103,10 +180,22 @@ class BotClient(showdown.Client):
 			f'{self.datestring}_Iteration{self.iterations_run}.model')
 
 	def log(self, *args):
+		now = datetime.now()
 		l = [str(arg) for arg in args]
 		string = ' '.join(l)
 		with open(self.log_file, 'a') as fd:
-			fd.write(f'{string}\n')
+			fd.write(f'[{datetime.now()}] {string}\n')
+
+	def should_play_new_game(self):
+		if self.runType == RunType.Iterations:
+			return self.iterations_run < self.iterations
+		elif self.runType == RunType.Epochs:
+			return self.agent.current_epoch < self.epochs
+		elif self.runType == RunType.Forever:
+			return True
+		else:
+			self.log(f'Unexpected run type {self.runType}')
+			raise Exception('Unexpected run type')
 
 	def save_replay(self, room_obj):
 		replays_dir = os.path.join(BOT_DIR, 'replays')
@@ -142,7 +231,9 @@ class BotClient(showdown.Client):
 		self.log(f'Moves: {moves}')
 		valid_actions = []
 		for move_index, move_data in enumerate(moves):
-			if move_data.get('pp', 0) > 0:
+			if ((move_data.get('pp', 0) > 0 and not move_data.get('disabled'))
+				or move_data.get('move') == 'Struggle'):
+				
 				valid_actions.append((move_index + 1, 
 					move_data['move'], 
 					ActionType.Move))
@@ -183,25 +274,12 @@ class BotClient(showdown.Client):
 	def get_pokemon(pokemon_data):
 		return pokemon_data.split(':')[1].strip()
 
-	def add_status(self, statuses, pokemon_name, status):
-		pokemon_statuses = statuses.get(pokemon_name, [])
-		pokemon_statuses.append(status)
-		statuses[pokemon_name] = pokemon_statuses
+	def add_status(self, player_name, pokemon_name, status):
+		self.gs.set_status(player_name, pokemon_name, status)
+
+	def remove_status(self, player_name, pokemon_name, status):
+		self.gs.remove_status(player_name, pokemon_name, status)
 		
-		self.log('Self Status', self.statuses)
-		self.log('Opp Status', self.opp_statuses)
-
-	def remove_status(self, statuses, pokemon_name, status):
-		pokemon_statuses = statuses.get(pokemon_name, [])
-		try:
-			pokemon_statuses.remove(status)
-		except ValueError:
-			pass
-		statuses[pokemon_name] = pokemon_statuses
-
-		self.log('Self Status', self.statuses)
-		self.log('Opp Status', self.opp_statuses)
-
 	async def challenge_expected(self):
 		self.log("Challenging {}".format(self.expected_opponent))
 		await self.cancel_challenge()
@@ -250,6 +328,9 @@ class BotClient(showdown.Client):
 					self.set_and_check_team(GameState.Player.one, self.team)
 					self.set_and_check_team(GameState.Player.two, self.opp_team)
 
+					self.gs.init_health(GameState.Player.one)
+					self.gs.init_health(GameState.Player.two)
+
 					#NOTE: Select starting pokemon here 
 					start_index = random.randint(1, self.teamsize)
 					await room_obj.start_poke(start_index)
@@ -271,16 +352,35 @@ class BotClient(showdown.Client):
 
 			elif inp_type == 'turn':
 				self.turn_number = int(params[0])
+				
+				active_pokemon = self.gs.all_active(GameState.Player.one)
+				self.log(f'P1 active: {active_pokemon}')
+				if len(active_pokemon) > 1:
+					self.log('ERROR: More than one active pokemon')
+
+				active_pokemon = self.gs.all_active(GameState.Player.two)
+				self.log(f'P2 active: {active_pokemon}')
+				if len(active_pokemon) > 1:
+					self.log('ERROR: More than one active pokemon')
+
+				self.log(f'P1 health: {self.gs.all_health(GameState.Player.one)}')
+				self.log(f'P2 health: {self.gs.all_health(GameState.Player.two)}')
+
+				self.log(f'P1 fainted: {self.gs.all_fainted(GameState.Player.one)}')
+				self.log(f'P2 fainted: {self.gs.all_fainted(GameState.Player.two)}')
+
+				self.log(f'P1 statuses: {self.gs.all_statuses(GameState.Player.one)}')
+				self.log(f'P2 statuses: {self.gs.all_statuses(GameState.Player.two)}')
+
 				if self.turn_number == 1:
 					self.state_vl = self.gs.vector_list
-				else:
-					#NOTE: this should be changed if using other reward functions besides win or lose the game
 					reward = 0
-					
+				else:
 					last_state = [element for element in self.state_vl]
-					self.state_vl = self.gs.vector_list
+					self.state_vl = [element for element in self.gs.vector_list]
 					done = False
 
+					reward = calculate_reward(self, last_state, self.state_vl)
 					transition = (last_state, 
 						self.action, 
 						reward, 
@@ -288,10 +388,8 @@ class BotClient(showdown.Client):
 						done)
 					self.log(f'Updating replay memory with {transition}')
 					self.agent.update_replay_memory(transition)
-					self.log(f'Successfully updated replay memory')
 					self.agent.train(False)
-					self.log(f'Trained')
-
+				self.log(f'This transition\'s reward was {reward}')
 			elif inp_type == 'request':
 				json_string = params[0]
 				data = json.loads(json_string)
@@ -366,36 +464,44 @@ class BotClient(showdown.Client):
 				pokemon_name = self.get_pokemon(pokemon_data)
 				status = params[1]
 				if self.own_pokemon(pokemon_data):
-					self.add_status(self.statuses, pokemon_name, status)
+					self.add_status(GameState.Player.one, pokemon_name, status)
+
 				else:
-					self.add_status(self.opp_statuses, pokemon_name, status)
+					self.add_status(GameState.Player.two, pokemon_name, status)
 
 			elif inp_type == '-start':
 				pokemon_data = params[0]
 				pokemon_name = self.get_pokemon(pokemon_data)
 				status = params[1]
 				if self.own_pokemon(pokemon_data):
-					self.add_status(self.statuses, pokemon_name, status)
+					self.add_status(GameState.Player.one, pokemon_name, status)
+
 				else:
-					self.add_status(self.opp_statuses, pokemon_name, status)
+					self.add_status(GameState.Player.two, pokemon_name, status)
 
 			elif inp_type == '-end':
 				pokemon_data = params[0]
 				pokemon_name = self.get_pokemon(pokemon_data)
 				status = params[1]
 				if self.own_pokemon(pokemon_data):
-					self.remove_status(self.statuses, pokemon_name, status)
+					self.remove_status(GameState.Player.one, pokemon_name, 
+						status)
+
 				else:
-					self.remove_status(self.opp_statuses, pokemon_name, status)
+					self.remove_status(GameState.Player.two, pokemon_name, 
+						status)
 
 			elif inp_type == '-curestatus':
 				pokemon_data = params[0]
 				pokemon_name = self.get_pokemon(pokemon_data)
 				status = params[1]
 				if self.own_pokemon(pokemon_data):
-					self.remove_status(self.statuses, pokemon_name, status)
+					self.remove_status(GameState.Player.one, pokemon_name, 
+						status)
+
 				else:
-					self.remove_status(self.opp_statuses, pokemon_name, status)
+					self.remove_status(GameState.Player.two, pokemon_name, 
+						status)
 
 			elif inp_type == 'switch':
 				name_with_owner = params[0]
@@ -405,18 +511,21 @@ class BotClient(showdown.Client):
 				volatile_statuses = ['confusion', 'curse']
 				if my_pokemon:
 					pokemon_name = self.active_pokemon
-					statuses = self.statuses
+					gs_player = GameState.Player.one
 				else:
 					pokemon_name = self.opp_active_pokemon
-					statuses = self.opp_statuses
-				for volatile_status in volatile_statuses:
-					self.remove_status(statuses, pokemon_name, volatile_status)
+					gs_player = GameState.Player.two
+				if pokemon_name != None:
+					for volatile_status in volatile_statuses:
+						self.remove_status(gs_player, pokemon_name, 
+							volatile_status)
 
 				new_active_name = GameState.pokemon_name_clean(name_with_details)
 				if not my_pokemon:
 					self.opp_active_pokemon = new_active_name
 					self.log('Opp active', self.opp_active_pokemon)
-					self.set_active(GameState.Player.two, self.opp_active_pokemon)
+					self.gs.set_active(GameState.Player.two, self.opp_active_pokemon)
+					self.log('set_active called for p2')
 					if not self.gs.check_active(GameState.Player.two, 
 						self.opp_active_pokemon):
 						
@@ -425,7 +534,8 @@ class BotClient(showdown.Client):
 				else:
 					self.active_pokemon = new_active_name
 					self.log('active_pokemon', self.active_pokemon)
-					self.set_active(GameState.Player.one, self.active_pokemon)
+					self.gs.set_active(GameState.Player.one, self.active_pokemon)
+					self.log('set_active called for p1')
 					if not self.gs.check_active(GameState.Player.one, 
 						self.active_pokemon):
 						
@@ -482,7 +592,7 @@ class BotClient(showdown.Client):
 				if winner == self.name:
 					self.wins += 1
 					self.log("We won")
-					reward = 10000 #NOTE: Reward is chosen somewhat arbitrarily
+					reward = 10000
 				else:
 					self.losses += 1
 					self.log("We lost")
@@ -502,7 +612,15 @@ class BotClient(showdown.Client):
 				trained = self.agent.train(True)
 				if trained:
 					self.log(f'Trained')
-					self.agent.save_model()
+					path = self.agent.save_model()
+					old_epoch = self.agent.current_epoch
+					epoch = self.agent.update_epoch()
+					if old_epoch < epoch:
+						self.log('Saving epoch model')
+						epoch_model_path = os.path.join(self.logs_dir, 
+							f'Epoch{epoch}.model')
+						self.agent.save_model(path=epoch_model_path)
+						self.agent.restart_epoch()
 				else:
 					self.log(f'Not trained')
 					
@@ -510,7 +628,7 @@ class BotClient(showdown.Client):
 				self.iterations_run += 1
 				self.update_log_paths()
 				
-				if self.iterations_run < self.iterations:
+				if self.should_play_new_game():
 					self.log("Starting iteration {}".format(self.iterations_run))
 					if self.challenge:
 						time.sleep(5)
@@ -528,14 +646,73 @@ class BotClient(showdown.Client):
 				self.log('ability')
 				#self.log(params)
 			
+			elif inp_type == 'faint':
+				player = params[0][0:2]
+				pokemon = params[0][4:].strip()
+
+				#TODO: remove this hack and have a good way of handling
+				#TODO: detailed vs. non-detailed pokemon names
+				pokemon = hack_name(pokemon)
+
+				self.log(f'{player}\'s {pokemon} has fainted')
+				if player == self.position:
+					gs_player = GameState.Player.one
+				else:
+					gs_player = GameState.Player.two
+
+				self.gs.set_fainted(gs_player, pokemon)
+				self.log('set_fainted called successfully')
+				if not self.gs.check_fainted(gs_player, pokemon):
+					self.log('ERROR: Gamestate fainted was not set as '
+						f'expected for {pokemon}')
+
 			elif inp_type == '-damage':
+				if len(params) <= 3:
+					player = params[0][0:2]
+					pokemon = params[0].lstrip('p1a: ').lstrip('p2a: ').strip()
+					pokemon = hack_name(pokemon)
+					health_data = params[1]
+					match = self.health_regex.search(health_data)
+					if match:
+						normalized_health = (float(match.group('numerator')) / 
+							float(match.group('denominator')))
+						self.log(f'{pokemon} has health {normalized_health}')
+						if player == self.position:
+							gs_player = GameState.Player.one
+						else:
+							gs_player = GameState.Player.two
+
+						self.gs.set_health(gs_player, pokemon, normalized_health)
+					else:
+						self.log(f'Could not track health for pokemon {pokemon}')
+				
 				# this section to track the enemy abilities
-				if (len(params) == 4):
+				elif len(params) == 4:
 					pokemon = params[3].strip('[of] p1a: ')
 					ability = params[2].strip('[from] ability: ')
 					# self.enemy_state.update_abilities(pokemon, ability)
 					self.log('Pokemon: ', pokemon, 'Enemy Ability: ', self.enemy_state.team_abilities[pokemon])
 			
+			elif inp_type == '-heal':
+				player = params[0][0:2]
+				pokemon = params[0].lstrip('p1a: ').lstrip('p2a: ').strip()
+				pokemon = hack_name(pokemon)
+				health_data = params[1]
+
+				match = self.health_regex.search(health_data)
+				if match:
+					normalized_health = (float(match.group('numerator')) / 
+						float(match.group('denominator')))
+					self.log(f'{pokemon} has health {normalized_health}')
+					if player == self.position:
+						gs_player = GameState.Player.one
+					else:
+						gs_player = GameState.Player.two
+
+					self.gs.set_health(gs_player, pokemon, normalized_health)
+				else:
+					self.log(f'Could not track health for pokemon {pokemon}')
+
 			elif inp_type == '-mega':
 				if ('p1a' in str(params[0])):
 					# Opposing player Mega 
@@ -593,17 +770,28 @@ class BotClient(showdown.Client):
 	async def on_challenge_update(self, challenge_data):
 		incoming = challenge_data.get('challengesFrom', {})
 		if self.expected_opponent.lower() in incoming:
+			if self.trainer:
+				model_paths = [os.path.join(self.logs_dir, content) 
+					for content in os.listdir(self.logs_dir) 
+					if content.endswith('.model') and 
+						content.startswith('Epoch')]
+				if len(model_paths) > 0:
+					sorted_model_paths = sorted(model_paths, 
+						key=lambda x: 
+							int(os.path.basename(x).lstrip('Epoch').rstrip('.model')))
+					model_to_load = sorted_model_paths[-1]
+					self.log(f'Loading model {model_to_load}')
+					self.agent = DQNAgent(INPUT_SHAPE, training=False)
+					self.agent.load_model(model_to_load)
 			await self.accept_challenge(self.expected_opponent, self.team_text)
 
 	async def on_room_init(self, room_obj):
 		if room_obj.id.startswith('battle-'):
 			self.log(f'Room ID: {room_obj.id}')
 			self.active_pokemon = None
-			self.statuses = {}
 			self.sidestart = []
 
 			self.opp_active_pokemon = None
-			self.opp_statuses = {}
 			self.opp_sidestart = []
 
 			self.weather = 'none'
@@ -614,14 +802,37 @@ def main():
 	username = args['<username>']
 	password = args['<password>']
 	expected_opponent = args['<expected_opponent>']
-	iterations = (int(args['--iterations']) if args['--iterations'] != None 
-		else 1) 
+	
+	forever = args['--forever']
+	if not forever:
+		iterations = (int(args['--iterations']) if args['--iterations'] != None 
+			else None)
+		if not iterations:
+			epochs = (int(args['--epochs']) if args['--epochs'] != None 
+				else None)
+			runType = RunType.Epochs
+			runTypeData = epochs
+		else:
+			runType = RunType.Iterations
+			runTypeData = iterations
+			epochs = None
+	else:
+		runType = RunType.Forever
+		runTypeData = None
+		iterations = None
+		epochs = None
+
 	challenge = args['--challenge']
 	model_type = args['--modeltype'] if args['--modeltype'] != None else 'dqn'
 	epsilon_decay = (float(args['--epsilondecay']) 
 		if args['--epsilondecay'] != None 
 		else 0.99)
-	is_training = not args['--notraining'] 
+	trainer = args['--trainer']
+	if trainer:
+		is_training = False
+	else:
+		is_training = not args['--notraining'] 
+
 	load_model_path = args.get('--load_model')
 	print_stats = args.get('--printstats')
 
@@ -641,23 +852,27 @@ def main():
 				TYPE_MAP[name].append(type2)
 
 	if model_type == 'dqn':
-		input_shape = (GameState.vector_dimension(),)
-
-		agent = DQNAgent(input_shape, epsilon_decay=epsilon_decay, 
-			training=is_training)
-		if load_model_path:
-			agent.load_model(load_model_path)
+		if not trainer:
+			agent = DQNAgent(INPUT_SHAPE, epsilon_decay=epsilon_decay, 
+				training=is_training)
+			if load_model_path:
+				agent.load_model(load_model_path)
+		else:
+			if load_model_path:
+				agent = DQNAgent(INPUT_SHAPE, training=False)
+				agent.load_model(load_model_path)
+			else:
+				agent = RandomAgent()
 
 		BotClient(name=username, password=password, 
 			expected_opponent=expected_opponent, team=team, 
-			challenge=challenge, iterations=iterations, 
-			agent=agent, print_stats=print_stats).start()
+			challenge=challenge, runType=runType, runTypeData=runTypeData, 
+			agent=agent, print_stats=print_stats, trainer=trainer).start()
 	elif model_type == 'random':
-		input_shape = (GameState.vector_dimension(),)
 		BotClient(name=username, password=password, 
 			expected_opponent=expected_opponent, team=team, 
-			challenge=challenge, iterations=iterations, 
-			agent=None, print_stats=print_stats).start()
+			challenge=challenge, runType=RunType.Iterations, 
+			runTypeData=iterations, agent=None, print_stats=print_stats).start()
 
 if __name__ == '__main__':
 	random.seed()

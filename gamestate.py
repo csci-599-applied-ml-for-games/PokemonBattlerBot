@@ -77,11 +77,60 @@ TYPE_NAME_TO_INDEX = {
 }
 _, INDEX_TO_TYPE_NAME = attribute_dict_setup(TYPE_NAME_TO_INDEX)
 
+STATUS_NAME_TO_INDEX = {
+	'brn': increment_index(),
+	'par': increment_index(),
+	'slp': increment_index(),
+	'frz': increment_index(),
+	'psn': increment_index(),
+	'tox': increment_index(),
+	'confusion': increment_index(),
+	'flinch': increment_index(),
+	'trapped': increment_index(),
+	'trapper': increment_index(),
+	'partiallytrapped': increment_index(),
+	'lockedmove': increment_index(),
+	'twoturnmove': increment_index(),
+	'choicelock': increment_index(),
+	'mustrecharge': increment_index(),
+	'futuremove': increment_index(),
+	'healreplacement': increment_index(),
+	'stall': increment_index(),
+	'gem': increment_index(),
+	'raindance': increment_index(),
+	'primordialsea': increment_index(),
+	'sunnyday': increment_index(),
+	'desolateland': increment_index(),
+	'sandstorm': increment_index(),
+	'hail': increment_index(),
+	'deltastream': increment_index(),
+	'arceus': increment_index(),
+	'silvally': increment_index(),
+	'NotFound': increment_index(),
+}
+_, INDEX_TO_STATUS_NAME = attribute_dict_setup(STATUS_NAME_TO_INDEX)
+
 ACTIVE_STATE = increment_index()
 
 FAINTED_STATE = increment_index()
 
+NORMALIZED_HEALTH = increment_index()
+
 ATTRIBUTES_PER_POKEMON = INDEX_TRACKER + 1
+
+def health_sum(vector_list, player):
+	total = 0
+	for position in range(GameState.max_team_size):
+		total += vector_list[player * GameState.num_player_elements +
+			position * ATTRIBUTES_PER_POKEMON + NORMALIZED_HEALTH]
+	return total
+
+def ko_count(vector_list, player):
+	total = 0
+	for position in range(GameState.max_team_size):
+		total += vector_list[player * GameState.num_player_elements +
+			position * ATTRIBUTES_PER_POKEMON + FAINTED_STATE]
+	return total
 
 class GameState():
 	class Player(IntEnum):
@@ -129,6 +178,31 @@ class GameState():
 				POKEMON_NAME_TO_INDEX['NotFound'])
 			self.vector_list[player * GameState.num_player_elements +
 				team_position * ATTRIBUTES_PER_POKEMON + pokemon_index] = 1.0
+
+	def _set_health(self, player, position, value):
+		self.vector_list[player * GameState.num_player_elements +
+			position * ATTRIBUTES_PER_POKEMON + NORMALIZED_HEALTH] = value
+
+	def set_health(self, player, name, value):
+		position = self.name_to_position[player][name]
+		self._set_health(player, position, value)
+
+	def init_health(self, player):
+		for team_position in range(len(self.name_to_position[player])):
+			self._set_health(player, team_position, 1.0)
+
+	def check_health(self, player, name):
+		name = GameState.pokemon_name_clean(name)
+		position = self.name_to_position[player][name]
+		return (self.vector_list[player * GameState.num_player_elements +
+			position * ATTRIBUTES_PER_POKEMON + NORMALIZED_HEALTH])
+
+	def all_health(self, player):
+		health_list = []
+		team = self.name_to_position[player]
+		for name in team:
+			health_list.append((name, self.check_health(player, name)))
+		return health_list 
 
 	def check_team_position(self, player, position):
 		'''
@@ -188,12 +262,22 @@ class GameState():
 		return (self.vector_list[player * GameState.num_player_elements +
 			position * ATTRIBUTES_PER_POKEMON + ACTIVE_STATE] == 1.0)
 
+	def all_active(self, player):
+		active_pokemon = []
+		team = self.name_to_position[player]
+		for name in team:
+			if self.check_active(player, name):
+				active_pokemon.append(name)
+		return active_pokemon
+
 	def _set_fainted(self, player, position, value):
 		self.vector_list[player * GameState.num_player_elements +
 			position * ATTRIBUTES_PER_POKEMON + FAINTED_STATE] = value
 
 	def set_fainted(self, player, name):
 		team_position = self.name_to_position[player][name]
+		self._set_active(player, team_position, 0.0)
+		self._set_health(player, team_position, 0.0)
 		self._set_fainted(player, team_position, 1.0)
 
 	def check_fainted(self, player, name):
@@ -201,6 +285,17 @@ class GameState():
 		position = self.name_to_position[player][name]
 		return (self.vector_list[player * GameState.num_player_elements +
 			position * ATTRIBUTES_PER_POKEMON + FAINTED_STATE] == 1.0)
+
+	def all_fainted(self, player):
+		'''
+		Returns all of the fainted pokemon for player as a list of strings
+		'''
+		fainted = []
+		team = self.name_to_position[player]
+		for name in team:
+			if self.check_fainted(player, name):
+				fainted.append(name)
+		return fainted
 
 	def _set_move(self, player, position, move_position, value):
 		self.vector_list[player * GameState.num_player_elements +
@@ -256,6 +351,44 @@ class GameState():
 				types.append(INDEX_TO_TYPE_NAME[type_index - 
 					start_of_type_indices])
 		return types
+	
+	def _set_status(self, player, team_position, status_position, value):
+		self.vector_list[player * GameState.num_player_elements + 
+			team_position * ATTRIBUTES_PER_POKEMON + status_position] = value
+
+	def set_status(self, player, name, status_name):
+		team_position = self.name_to_position[player][name]
+		type_position = STATUS_NAME_TO_INDEX.get(status_name, STATUS_NAME_TO_INDEX['NotFound'])
+		self._set_status(player, team_position, type_position, 1.0)
+	
+	def remove_status(self, player, name, status_name):
+		team_position = self.name_to_position[player][name]
+		type_position = STATUS_NAME_TO_INDEX.get(status_name, STATUS_NAME_TO_INDEX['NotFound'])
+		self._set_status(player, team_position, type_position, 0.0)
+
+	def check_status(self, player, name):
+		name = GameState.pokemon_name_clean(name)
+		statuses = []
+		position = self.name_to_position[player][name]
+		start_checking = (player * GameState.num_player_elements +
+			position * ATTRIBUTES_PER_POKEMON + STATUS_NAME_TO_INDEX['Min'])
+		end_checking = start_checking + STATUS_NAME_TO_INDEX['Count']
+		
+		start_of_status_indices = (player * GameState.num_player_elements +
+			position * ATTRIBUTES_PER_POKEMON)
+		
+		for status_index in range(start_checking, end_checking):
+			if self.vector_list[status_index] == 1.0:
+				statuses.append(INDEX_TO_STATUS_NAME[status_index - 
+					start_of_status_indices])
+		return statuses
+
+	def all_statuses(self, player):
+		statuses = []
+		team = self.name_to_position[player]
+		for name in team:
+			statuses.append((name, self.check_status(player, name)))
+		return statuses
 
 	def update_abilities(self, player, pokemon, ability):
 		#TODO: replace implementation with packing into vector list
@@ -274,8 +407,6 @@ class GameState():
 		self.team_zpower[player][pokemon_name] = True
 
 	#set weather state
-
-	#set status
 
 
 if __name__ == '__main__':
@@ -392,6 +523,7 @@ if __name__ == '__main__':
 	for player in GameState.Player:
 		if player == GameState.Player.count:
 			continue
+
 		pokemon_types = [
 			('Pelipper', ['Water', 'Flying']),
 			('Greninja', ['Water', 'Dark']),
@@ -404,3 +536,101 @@ if __name__ == '__main__':
 			test_types(player, pokemon, type_names)
 		for pokemon, type_names in pokemon_types:
 			check_types(player, pokemon, type_names)
+
+	for player in GameState.Player:
+		if player == GameState.Player.count:
+			continue
+		expected_health = [
+			('Pelipper', 1.0),
+			('Greninja', 1.0),
+			('Swampert', 1.0),
+			('Manaphy', 1.0),
+			('Ferrothorn', 1.0),
+			('Tornadus', 1.0)
+		]
+		gs.init_health(player)
+		gs_health = gs.all_health(player)
+		if set(gs_health) != set(expected_health):
+			print(gs_health)
+			print('gs_health had unexpected values when testing init_health')
+
+		for (index, data) in enumerate(expected_health):
+			pokemon, _ = data
+			gs.set_health(player, pokemon, 0.0)
+			new_expected = [element for element in expected_health]
+			new_expected[index] = (pokemon, 0.0)
+			gs_health = gs.all_health(player)
+			if set(gs_health) != set(new_expected):
+				print(gs_health)
+				print('gs_health had unexpected values when testing set_health')
+			gs.set_health(player, pokemon, 1.0)
+
+	for player in GameState.Player:
+		if player == GameState.Player.count:
+			continue
+
+		gs.init_health(player)
+		player_health_sum = health_sum(gs.vector_list, player)
+		if player_health_sum != 6.0:
+			print('ERROR: unexpected health sum after init')
+		for position in range(len(gs.name_to_position[player])):
+			gs._set_health(player, position, 0.0)
+
+			player_health_sum = health_sum(gs.vector_list, player)
+			expected_sum = 6.0 - (position + 1)
+			if player_health_sum != expected_sum:
+				print('ERROR: unexpected health sum. ' 
+					f'Expected {expected_sum} but had {player_health_sum}')
+
+
+	for player in GameState.Player:
+		if player == GameState.Player.count:
+			continue
+
+		for position in range(len(gs.name_to_position[player])):
+			gs._set_fainted(player, position, 0.0)
+
+		player_ko_count = ko_count(gs.vector_list, player)
+		if player_ko_count != 0.0:
+			print('ERROR: unexpected player_ko_count after setup')
+
+		if player == GameState.Player.one: 
+			team = team1 
+		else:
+			team = team2
+		for expected_index, expected_name in enumerate(team): 
+			gs.set_fainted(player, expected_name)		
+			player_ko_count = ko_count(gs.vector_list, player)
+			expected_ko_count = expected_index + 1
+			if player_ko_count != expected_ko_count:
+				print(f'ERROR: expected {expected_ko_count} KOs but had '
+					f'{player_ko_count}')
+
+
+	def check_statuses(player, pokemon, status_names):
+		has_statuses = gs.check_status(player, pokemon)
+		if set(has_statuses) != set(status_names):
+			print(f'{pokemon} has types {has_statuses} instead of {status_names}')
+
+	def test_statuses(player, pokemon, status_names):
+		for status_name in status_names:
+			gs.set_status(player, pokemon, status_name)
+		check_statuses(player, pokemon, status_names)
+	
+	for player in GameState.Player:
+		if player == GameState.Player.count:
+			continue
+		
+		#Note: just a test input, such a combination of statuses is unlikely
+		pokemon_statuses = [
+			('Pelipper', ['brn', 'par', 'slp', 'frz', 'psn', 'tox']),
+			('Greninja', ['confusion', 'flinch', 'trapped', 'trapper']),
+			('Swampert', ['partiallytrapped', 'lockedmove', 'twoturnmove', 'choicelock']),
+			('Manaphy', ['mustrecharge', 'futuremove', 'healreplacement', 'stall', 'gem']),
+			('Ferrothorn', ['raindance', 'primordialsea', 'sunnyday', 'desolateland']),
+			('Tornadus', ['sandstorm', 'hail', 'deltastream', 'arceus', 'silvally'])
+		]
+		for pokemon, status_names in pokemon_statuses:
+			test_statuses(player, pokemon, status_names)
+		for pokemon, status_names in pokemon_statuses:
+			check_statuses(player, pokemon, status_names)
