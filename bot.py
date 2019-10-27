@@ -240,9 +240,8 @@ class BotClient(showdown.Client):
 			fainted = 'fnt' in pokemon_info.get('condition')
 			if (not pokemon_info.get('active', False) and 
 				not fainted):
-				self.log('cleaning name')
+
 				pokemon_name = self.gs.pokemon_name_clean(pokemon_info['details'])
-				self.log('appending')
 				valid_actions.append((pokemon_index + 1 , 
 					pokemon_name, 
 					ActionType.Switch))
