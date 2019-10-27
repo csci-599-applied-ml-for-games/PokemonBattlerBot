@@ -10,12 +10,53 @@ def increment_index():
 	INDEX_TRACKER += 1
 	return INDEX_TRACKER
 
+SHARED_INDEX_TRACKER = 0
+def increment_shared_index():
+	global SHARED_INDEX_TRACKER
+	SHARED_INDEX_TRACKER += 1
+	return SHARED_INDEX_TRACKER
+
 def attribute_dict_setup(attribute_dict):
 	reversed_dict = {v: k for k, v in attribute_dict.items()}
 	our_min = min([v for k, v in attribute_dict.items()])
 	attribute_dict['Count'] = len(attribute_dict)
 	attribute_dict['Min'] = our_min
 	return attribute_dict, reversed_dict 
+
+WEATHER_NAME_TO_INDEX = {
+	'RainDance': SHARED_INDEX_TRACKER,
+	'PrimordialSea': increment_shared_index(),
+	'SunnyDay': increment_shared_index(),
+	'DesolateLand': increment_shared_index(),
+	'Sandstorm': increment_shared_index(),
+	'Hail': increment_shared_index(),
+	'DeltaStream': increment_shared_index(),
+	'NotFound': increment_shared_index()
+}
+
+_, INDEX_TO_WEATHER_NAME = attribute_dict_setup(WEATHER_NAME_TO_INDEX)
+
+SHARED_ATTRIBUTES_COUNT = SHARED_INDEX_TRACKER + 1
+
+TEAM_INDEX_TRACKER = 0
+def increment_team_index():
+	global TEAM_INDEX_TRACKER
+	TEAM_INDEX_TRACKER += 1
+	return TEAM_INDEX_TRACKER
+
+ACTIVE_POKEMON_BOOST = {
+	'atk': TEAM_INDEX_TRACKER,
+	'def': increment_team_index(),
+	'spa': increment_team_index(),
+	'spd': increment_team_index(),
+	'spe': increment_team_index(),
+	'accuracy': increment_team_index(),
+	'evasion': increment_team_index(), 
+	'NotFound': increment_team_index()
+}
+TEAM_ATTRIBUTES_COUNT = TEAM_INDEX_TRACKER + 1
+MAX_BOOST = 12.0
+MIN_BOOST = 0.0
 
 POKEMON_NAME_TO_INDEX = {
 	'Pelipper': INDEX_TRACKER,
@@ -118,18 +159,23 @@ NORMALIZED_HEALTH = increment_index()
 
 ATTRIBUTES_PER_POKEMON = INDEX_TRACKER + 1
 
+def start_of_pokemon(player, team_position):
+	return (SHARED_ATTRIBUTES_COUNT + 
+		player * GameState.num_player_elements + 
+		TEAM_ATTRIBUTES_COUNT +
+		team_position * ATTRIBUTES_PER_POKEMON)
+
 def health_sum(vector_list, player):
 	total = 0
 	for position in range(GameState.max_team_size):
-		total += vector_list[player * GameState.num_player_elements +
-			position * ATTRIBUTES_PER_POKEMON + NORMALIZED_HEALTH]
+		total += vector_list[start_of_pokemon(player, position) + 
+			NORMALIZED_HEALTH]
 	return total
 
 def ko_count(vector_list, player):
 	total = 0
 	for position in range(GameState.max_team_size):
-		total += vector_list[player * GameState.num_player_elements +
-			position * ATTRIBUTES_PER_POKEMON + FAINTED_STATE]
+		total += vector_list[start_of_pokemon(player, position) + FAINTED_STATE]
 	return total
 
 class GameState():
@@ -144,11 +190,13 @@ class GameState():
 
 	max_team_size = 6
 
-	num_player_elements = max_team_size * ATTRIBUTES_PER_POKEMON
+	num_player_elements = (TEAM_ATTRIBUTES_COUNT + 
+		max_team_size * ATTRIBUTES_PER_POKEMON)
 
 	@staticmethod
 	def vector_dimension():
-		return GameState.Player.count * GameState.num_player_elements
+		return (SHARED_ATTRIBUTES_COUNT + 
+			GameState.Player.count * GameState.num_player_elements)
 
 	def __init__(self):
 		self.vector_list = [0.0 for _ in range(GameState.vector_dimension())]
@@ -157,6 +205,56 @@ class GameState():
 		self.name_to_position = [{}, {}] 
 		self.team_abilities = [{}, {}] #TODO: remove and pack in vector_list
 		self.team_mega = [{}, {}]
+
+	def _set_weather(self, weather_name, value):
+		position = WEATHER_NAME_TO_INDEX.get(weather_name, 
+			WEATHER_NAME_TO_INDEX['NotFound'])
+		self.vector_list[position] = value
+
+	def set_player_attribute(self, player, attribute_index, value):
+		self.vector_list[SHARED_ATTRIBUTES_COUNT + 
+			player * GameState.num_player_elements + 
+			TEAM_ATTRIBUTES_COUNT +
+			attribute_index] = value
+
+	def get_player_attribute(self, player, attribute_index):
+		return self.vector_list[SHARED_ATTRIBUTES_COUNT + 
+			player * GameState.num_player_elements + 
+			TEAM_ATTRIBUTES_COUNT +
+			attribute_index]
+
+	def set_pokemon_attribute(self, player, team_position, attribute_index, 
+		value):
+		
+		self.vector_list[start_of_pokemon(player, team_position) + 
+			attribute_index] = value
+
+	def get_pokemon_attribute(self, player, team_position, attribute_index):
+		return self.vector_list[start_of_pokemon(player, team_position) 
+			+ attribute_index]
+
+	def set_weather(self, weather_name):
+		self.clear_all_weather()
+		self._set_weather(weather_name, 1.0)
+
+	def clear_all_weather(self):
+		for weather_name in WEATHER_NAME_TO_INDEX:
+			self._set_weather(weather_name, 0.0)
+
+	def clear_weather(self, weather_name):
+		self.vector_list[WEATHER_NAME_TO_INDEX[weather_name]] = 0.0
+
+	def check_weather(self, weather_name):
+		return self.vector_list[WEATHER_NAME_TO_INDEX[weather_name]] == 1.0
+
+	def all_weather(self):
+		weathers = []
+		for weather_name in WEATHER_NAME_TO_INDEX:
+			if weather_name == 'Min' or weather_name == 'Count':
+				continue
+			if self.check_weather(weather_name):
+				weathers.append(weather_name)
+		return weathers
 
 	@staticmethod
 	def pokemon_name_clean(pokemon_name):
@@ -176,12 +274,11 @@ class GameState():
 
 			pokemon_index = POKEMON_NAME_TO_INDEX.get(pokemon_name, 
 				POKEMON_NAME_TO_INDEX['NotFound'])
-			self.vector_list[player * GameState.num_player_elements +
-				team_position * ATTRIBUTES_PER_POKEMON + pokemon_index] = 1.0
+			self.set_pokemon_attribute(player, team_position, pokemon_index, 
+				1.0)
 
 	def _set_health(self, player, position, value):
-		self.vector_list[player * GameState.num_player_elements +
-			position * ATTRIBUTES_PER_POKEMON + NORMALIZED_HEALTH] = value
+		self.set_pokemon_attribute(player, position, NORMALIZED_HEALTH, value)
 
 	def set_health(self, player, name, value):
 		position = self.name_to_position[player][name]
@@ -194,8 +291,7 @@ class GameState():
 	def check_health(self, player, name):
 		name = GameState.pokemon_name_clean(name)
 		position = self.name_to_position[player][name]
-		return (self.vector_list[player * GameState.num_player_elements +
-			position * ATTRIBUTES_PER_POKEMON + NORMALIZED_HEALTH])
+		return self.get_pokemon_attribute(player, position, NORMALIZED_HEALTH)
 
 	def all_health(self, player):
 		health_list = []
@@ -212,8 +308,7 @@ class GameState():
 		player: member of Player enum
 		position: the position that the pokemon takes on the team. zero-indexed
 		'''
-		start_checking = (player * GameState.num_player_elements + 
-			position * ATTRIBUTES_PER_POKEMON)
+		start_checking = start_of_pokemon(player, position) 
 		end_checking = start_checking + POKEMON_NAME_TO_INDEX['Count']
 		for pokemon_index in range(start_checking, end_checking):
 			if self.vector_list[pokemon_index] == 1.0:
@@ -231,8 +326,7 @@ class GameState():
 		position: the position that the pokemon takes on the team. zero-indexed
 		value: float for value
 		'''
-		self.vector_list[player * GameState.num_player_elements +
-			position * ATTRIBUTES_PER_POKEMON + ACTIVE_STATE] = value
+		self.set_pokemon_attribute(player, position, ACTIVE_STATE, value)
 
 	def set_active(self, player, name):
 		'''
@@ -259,8 +353,7 @@ class GameState():
 		'''
 		name = GameState.pokemon_name_clean(name)
 		position = self.name_to_position[player][name]
-		return (self.vector_list[player * GameState.num_player_elements +
-			position * ATTRIBUTES_PER_POKEMON + ACTIVE_STATE] == 1.0)
+		return self.get_pokemon_attribute(player, position, ACTIVE_STATE)
 
 	def all_active(self, player):
 		active_pokemon = []
@@ -271,8 +364,7 @@ class GameState():
 		return active_pokemon
 
 	def _set_fainted(self, player, position, value):
-		self.vector_list[player * GameState.num_player_elements +
-			position * ATTRIBUTES_PER_POKEMON + FAINTED_STATE] = value
+		self.set_pokemon_attribute(player, position, FAINTED_STATE, value)
 
 	def set_fainted(self, player, name):
 		team_position = self.name_to_position[player][name]
@@ -283,9 +375,8 @@ class GameState():
 	def check_fainted(self, player, name):
 		name = GameState.pokemon_name_clean(name)
 		position = self.name_to_position[player][name]
-		return (self.vector_list[player * GameState.num_player_elements +
-			position * ATTRIBUTES_PER_POKEMON + FAINTED_STATE] == 1.0)
-
+		return self.get_pokemon_attribute(player, position, FAINTED_STATE) == 1.0
+	
 	def all_fainted(self, player):
 		'''
 		Returns all of the fainted pokemon for player as a list of strings
@@ -298,8 +389,7 @@ class GameState():
 		return fainted
 
 	def _set_move(self, player, position, move_position, value):
-		self.vector_list[player * GameState.num_player_elements +
-			position * ATTRIBUTES_PER_POKEMON + move_position] = value
+		self.set_pokemon_attribute(player, position, move_position, value)
 
 	def set_move(self, player, name, move_name):
 		team_position = self.name_to_position[player][name]
@@ -310,12 +400,11 @@ class GameState():
 		name = GameState.pokemon_name_clean(name)
 		moves = []
 		position = self.name_to_position[player][name]
-		start_checking = (player * GameState.num_player_elements +
-			position * ATTRIBUTES_PER_POKEMON + MOVE_NAME_TO_INDEX['Min'])
+		start_checking = (start_of_pokemon(player, position) + 
+			MOVE_NAME_TO_INDEX['Min'])
 		end_checking = start_checking + MOVE_NAME_TO_INDEX['Count']
-		
-		start_of_move_indices = (player * GameState.num_player_elements +
-			position * ATTRIBUTES_PER_POKEMON)
+
+		start_of_move_indices = start_of_pokemon(player, position)
 		for move_index in range(start_checking, end_checking):
 			if self.vector_list[move_index] == 1.0:
 				moves.append(INDEX_TO_MOVE_NAME[move_index - 
@@ -323,8 +412,7 @@ class GameState():
 		return moves
 
 	def _set_type(self, player, position, type_position, value):
-		self.vector_list[player * GameState.num_player_elements +
-			position * ATTRIBUTES_PER_POKEMON + type_position] = value
+		self.set_pokemon_attribute(player, position, type_position, value)
 
 	def set_type(self, player, name, type_name):
 		team_position = self.name_to_position[player][name]
@@ -339,12 +427,11 @@ class GameState():
 		name = GameState.pokemon_name_clean(name)
 		types = []
 		position = self.name_to_position[player][name]
-		start_checking = (player * GameState.num_player_elements +
-			position * ATTRIBUTES_PER_POKEMON + TYPE_NAME_TO_INDEX['Min'])
+		start_checking = (start_of_pokemon(player, position) + 
+			TYPE_NAME_TO_INDEX['Min'])
 		end_checking = start_checking + TYPE_NAME_TO_INDEX['Count']
 		
-		start_of_type_indices = (player * GameState.num_player_elements +
-			position * ATTRIBUTES_PER_POKEMON)
+		start_of_type_indices = start_of_pokemon(player, position)
 		
 		for type_index in range(start_checking, end_checking):
 			if self.vector_list[type_index] == 1.0:
@@ -353,8 +440,7 @@ class GameState():
 		return types
 	
 	def _set_status(self, player, team_position, status_position, value):
-		self.vector_list[player * GameState.num_player_elements + 
-			team_position * ATTRIBUTES_PER_POKEMON + status_position] = value
+		self.set_pokemon_attribute(player, team_position, status_position, value)
 
 	def set_status(self, player, name, status_name):
 		team_position = self.name_to_position[player][name]
@@ -370,12 +456,11 @@ class GameState():
 		name = GameState.pokemon_name_clean(name)
 		statuses = []
 		position = self.name_to_position[player][name]
-		start_checking = (player * GameState.num_player_elements +
-			position * ATTRIBUTES_PER_POKEMON + STATUS_NAME_TO_INDEX['Min'])
+		start_checking = (start_of_pokemon(player, position) + 
+			STATUS_NAME_TO_INDEX['Min'])
 		end_checking = start_checking + STATUS_NAME_TO_INDEX['Count']
 		
-		start_of_status_indices = (player * GameState.num_player_elements +
-			position * ATTRIBUTES_PER_POKEMON)
+		start_of_status_indices = start_of_pokemon(player, position)
 		
 		for status_index in range(start_checking, end_checking):
 			if self.vector_list[status_index] == 1.0:
@@ -389,6 +474,36 @@ class GameState():
 		for name in team:
 			statuses.append((name, self.check_status(player, name)))
 		return statuses
+
+	def reset_boosts(self, player):
+		for boost_name in ACTIVE_POKEMON_BOOST:
+			self.set_boost(player, boost_name, 0.5)
+
+	def _set_boost(self, player, boost_position, value):
+		self.set_player_attribute(player, boost_position, value)
+
+	def set_boost(self, player, boost_name, value):
+		boost_position = ACTIVE_POKEMON_BOOST[boost_name]
+		if value < 0.0:
+			value = 0.0
+		elif value > 1.0:
+			value = 1.0
+		self._set_boost(player, boost_position, value)
+
+	def get_boost(self, player, boost_name):
+		boost_position = ACTIVE_POKEMON_BOOST[boost_name]
+		return self.get_player_attribute(player, boost_position)
+
+	def add_boost(self, player, boost_name, delta):
+		normalized_delta = delta / MAX_BOOST
+		current_boost = self.get_boost(player, boost_name)
+		self.set_boost(player, boost_name, normalized_delta + current_boost)
+
+	def all_boosts(self, player):
+		boosts = []
+		for boost_name in ACTIVE_POKEMON_BOOST:
+			boosts.append((boost_name, self.get_boost(player, boost_name)))
+		return boosts
 
 	def update_abilities(self, player, pokemon, ability):
 		#TODO: replace implementation with packing into vector list
@@ -406,7 +521,6 @@ class GameState():
 		pokemon_name = GameState.pokemon_name_clean(str(pokemon))
 		self.team_zpower[player][pokemon_name] = True
 
-	#set weather state
 
 
 if __name__ == '__main__':
@@ -561,8 +675,9 @@ if __name__ == '__main__':
 			new_expected[index] = (pokemon, 0.0)
 			gs_health = gs.all_health(player)
 			if set(gs_health) != set(new_expected):
-				print(gs_health)
 				print('gs_health had unexpected values when testing set_health')
+				print(f'Got {gs_health}')
+				print(f'Expected {new_expected}')
 			gs.set_health(player, pokemon, 1.0)
 
 	for player in GameState.Player:
@@ -572,7 +687,7 @@ if __name__ == '__main__':
 		gs.init_health(player)
 		player_health_sum = health_sum(gs.vector_list, player)
 		if player_health_sum != 6.0:
-			print('ERROR: unexpected health sum after init')
+			print(f'ERROR: unexpected health sum {player_health_sum} after init')
 		for position in range(len(gs.name_to_position[player])):
 			gs._set_health(player, position, 0.0)
 
@@ -634,3 +749,111 @@ if __name__ == '__main__':
 			test_statuses(player, pokemon, status_names)
 		for pokemon, status_names in pokemon_statuses:
 			check_statuses(player, pokemon, status_names)
+
+	weathers = gs.all_weather()
+	if weathers != []:
+		print(f'Weathers was {weathers} instead of []')
+	gs.set_weather('RainDance')
+	weathers = gs.all_weather()
+	if len(weathers) > 1 or 'RainDance' not in weathers:
+		print(f'Weathers was {weathers} not [\'RainDance\']')
+
+	gs.set_weather('SunnyDay')
+	weathers = gs.all_weather()
+	if len(weathers) > 1 or 'SunnyDay' not in weathers:
+		print(f'Weathers was {weathers} not [\'SunnyDay\']')
+
+	gs.clear_all_weather()
+	weathers = gs.all_weather()
+	if weathers != []:
+		print(f'Weathers was {weathers} instead of []')
+
+	def reset_and_check(gs, player, expected_boosts):
+		gs.reset_boosts(player)
+		boosts = gs.all_boosts(player) 
+		if set(boosts) != set(expected_boosts):
+			print('Unexpected boost values')
+
+	for player in GameState.Player:
+		if player == GameState.Player.count:
+			continue 
+
+		expected_boosts = (('atk', 0.5),
+			('def', 0.5), 
+			('spa', 0.5), 
+			('spd', 0.5), 
+			('spe', 0.5), 
+			('accuracy', 0.5), 
+			('evasion', 0.5)) 
+		reset_and_check(gs, player, expected_boosts)
+
+		for index, boost_name in enumerate(ACTIVE_POKEMON_BOOST):
+			reset_and_check(gs, player, expected_boosts)
+
+			new_expected_boosts = [old_boost for old_boost in expected_boosts]
+			
+			gs.add_boost(player, boost_name, 3)
+			new_expected_boosts[index] = (boost_name, 0.75)
+			boosts = gs.all_boosts(player)
+			if set(new_expected_boosts) != set(boosts):
+				print('Unexpected boost values')
+				print(f'Expected {new_expected_boosts}')
+				print(f'Got {boosts}')
+
+			gs.add_boost(player, boost_name, 3)
+			new_expected_boosts[index] = (boost_name, 1.0)
+			boosts = gs.all_boosts(player)
+			if set(new_expected_boosts) != set(boosts):
+				print('Unexpected boost values')
+				print(f'Expected {new_expected_boosts}')
+				print(f'Got {boosts}')
+
+			gs.add_boost(player, boost_name, 3)
+			new_expected_boosts[index] = (boost_name, 1.0)
+			boosts = gs.all_boosts(player)
+			if set(new_expected_boosts) != set(boosts):
+				print('Unexpected boost values')
+				print(f'Expected {new_expected_boosts}')
+				print(f'Got {boosts}')
+
+			gs.add_boost(player, boost_name, -3)
+			new_expected_boosts[index] = (boost_name, 0.75)
+			boosts = gs.all_boosts(player)
+			if set(new_expected_boosts) != set(boosts):
+				print('Unexpected boost values')
+				print(f'Expected {new_expected_boosts}')
+				print(f'Got {boosts}')
+
+			gs.add_boost(player, boost_name, -3)
+			new_expected_boosts[index] = (boost_name, 0.5)
+			boosts = gs.all_boosts(player)
+			if set(new_expected_boosts) != set(boosts):
+				print('Unexpected boost values')
+				print(f'Expected {new_expected_boosts}')
+				print(f'Got {boosts}')
+
+			gs.add_boost(player, boost_name, -3)
+			new_expected_boosts[index] = (boost_name, 0.25)
+			boosts = gs.all_boosts(player)
+			if set(new_expected_boosts) != set(boosts):
+				print('Unexpected boost values')
+				print(f'Expected {new_expected_boosts}')
+				print(f'Got {boosts}')
+
+			gs.add_boost(player, boost_name, -3)
+			new_expected_boosts[index] = (boost_name, 0.0)
+			boosts = gs.all_boosts(player)
+			if set(new_expected_boosts) != set(boosts):
+				print('Unexpected boost values')
+				print(f'Expected {new_expected_boosts}')
+				print(f'Got {boosts}')
+
+			gs.add_boost(player, boost_name, -3)
+			new_expected_boosts[index] = (boost_name, 0.0)
+			boosts = gs.all_boosts(player)
+			if set(new_expected_boosts) != set(boosts):
+				print('Unexpected boost values')
+				print(f'Expected {new_expected_boosts}')
+				print(f'Got {boosts}')
+			
+			break
