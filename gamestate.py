@@ -24,7 +24,7 @@ def attribute_dict_setup(attribute_dict):
 	return attribute_dict, reversed_dict 
 
 WEATHER_NAME_TO_INDEX = {
-	'RainDance': increment_shared_index(),
+	'RainDance': SHARED_INDEX_TRACKER,
 	'PrimordialSea': increment_shared_index(),
 	'SunnyDay': increment_shared_index(),
 	'DesolateLand': increment_shared_index(),
@@ -37,6 +37,25 @@ WEATHER_NAME_TO_INDEX = {
 _, INDEX_TO_WEATHER_NAME = attribute_dict_setup(WEATHER_NAME_TO_INDEX)
 
 SHARED_ATTRIBUTES_COUNT = SHARED_INDEX_TRACKER + 1
+
+TEAM_INDEX_TRACKER = 0
+def increment_team_index():
+	global TEAM_INDEX_TRACKER
+	TEAM_INDEX_TRACKER += 1
+	return TEAM_INDEX_TRACKER
+
+ACTIVE_POKEMON_BOOST = {
+	'atk': TEAM_INDEX_TRACKER,
+	'def': increment_team_index(),
+	'spa': increment_team_index(),
+	'spd': increment_team_index(),
+	'spe': increment_team_index(),
+	'accuracy': increment_team_index(),
+	'evasion': increment_team_index()
+}
+TEAM_ATTRIBUTES_COUNT = TEAM_INDEX_TRACKER + 1
+MAX_BOOST = 12.0
+MIN_BOOST = 0.0
 
 POKEMON_NAME_TO_INDEX = {
 	'Pelipper': INDEX_TRACKER,
@@ -142,6 +161,7 @@ ATTRIBUTES_PER_POKEMON = INDEX_TRACKER + 1
 def start_of_pokemon(player, team_position):
 	return (SHARED_ATTRIBUTES_COUNT + 
 		player * GameState.num_player_elements + 
+		TEAM_ATTRIBUTES_COUNT +
 		team_position * ATTRIBUTES_PER_POKEMON)
 
 def health_sum(vector_list, player):
@@ -169,7 +189,7 @@ class GameState():
 
 	max_team_size = 6
 
-	num_player_elements = (SHARED_ATTRIBUTES_COUNT + 
+	num_player_elements = (SHARED_ATTRIBUTES_COUNT + TEAM_ATTRIBUTES_COUNT + 
 		max_team_size * ATTRIBUTES_PER_POKEMON)
 
 	@staticmethod
@@ -188,6 +208,18 @@ class GameState():
 		position = WEATHER_NAME_TO_INDEX.get(weather_name, 
 			WEATHER_NAME_TO_INDEX['NotFound'])
 		self.vector_list[position] = value
+
+	def set_player_attribute(self, player, attribute_index, value):
+		self.vector_list[SHARED_ATTRIBUTES_COUNT + 
+			player * GameState.num_player_elements + 
+			TEAM_ATTRIBUTES_COUNT +
+			attribute_index] = value
+
+	def get_player_attribute(self, player, attribute_index):
+		return self.vector_list[SHARED_ATTRIBUTES_COUNT + 
+			player * GameState.num_player_elements + 
+			TEAM_ATTRIBUTES_COUNT +
+			attribute_index]
 
 	def set_pokemon_attribute(self, player, team_position, attribute_index, 
 		value):
@@ -257,9 +289,6 @@ class GameState():
 	def check_health(self, player, name):
 		name = GameState.pokemon_name_clean(name)
 		position = self.name_to_position[player][name]
-		return (self.vector_list[SHARED_ATTRIBUTES_COUNT + 
-			player * GameState.num_player_elements +
-			position * ATTRIBUTES_PER_POKEMON + NORMALIZED_HEALTH])
 		return self.get_pokemon_attribute(player, position, NORMALIZED_HEALTH)
 
 	def all_health(self, player):
@@ -410,7 +439,7 @@ class GameState():
 	
 	def _set_status(self, player, team_position, status_position, value):
 		self.set_pokemon_attribute(player, team_position, status_position, value)
-		
+
 	def set_status(self, player, name, status_name):
 		team_position = self.name_to_position[player][name]
 		type_position = STATUS_NAME_TO_INDEX.get(status_name, STATUS_NAME_TO_INDEX['NotFound'])
@@ -444,6 +473,36 @@ class GameState():
 			statuses.append((name, self.check_status(player, name)))
 		return statuses
 
+	def reset_boosts(self, player):
+		for boost_name in ACTIVE_POKEMON_BOOST:
+			self.set_boost(player, boost_name, 0.5)
+
+	def _set_boost(self, player, boost_position, value):
+		self.set_player_attribute(player, boost_position, value)
+
+	def set_boost(self, player, boost_name, value):
+		boost_position = ACTIVE_POKEMON_BOOST[boost_name]
+		if value < 0.0:
+			value = 0.0
+		elif value > 1.0:
+			value = 1.0
+		self._set_boost(player, boost_position, value)
+
+	def get_boost(self, player, boost_name):
+		boost_position = ACTIVE_POKEMON_BOOST[boost_name]
+		return self.get_player_attribute(player, boost_position)
+
+	def add_boost(self, player, boost_name, delta):
+		normalized_delta = delta / MAX_BOOST
+		current_boost = self.get_boost(player, boost_name)
+		self.set_boost(player, boost_name, normalized_delta + current_boost)
+
+	def all_boosts(self, player):
+		boosts = []
+		for boost_name in ACTIVE_POKEMON_BOOST:
+			boosts.append((boost_name, self.get_boost(player, boost_name)))
+		return boosts
+
 	def update_abilities(self, player, pokemon, ability):
 		#TODO: replace implementation with packing into vector list
 		pokemon_name = GameState.pokemon_name_clean(str(pokemon))
@@ -460,7 +519,6 @@ class GameState():
 		pokemon_name = GameState.pokemon_name_clean(str(pokemon))
 		self.team_zpower[player][pokemon_name] = True
 
-	#set weather state
 
 
 if __name__ == '__main__':
@@ -707,3 +765,93 @@ if __name__ == '__main__':
 	weathers = gs.all_weather()
 	if weathers != []:
 		print(f'Weathers was {weathers} instead of []')
+
+	def reset_and_check(gs, player, expected_boosts):
+		gs.reset_boosts(player)
+		boosts = gs.all_boosts(player) 
+		if set(boosts) != set(expected_boosts):
+			print('Unexpected boost values')
+
+	for player in GameState.Player:
+		if player == GameState.Player.count:
+			continue 
+
+		expected_boosts = (('atk', 0.5),
+			('def', 0.5), 
+			('spa', 0.5), 
+			('spd', 0.5), 
+			('spe', 0.5), 
+			('accuracy', 0.5), 
+			('evasion', 0.5)) 
+		reset_and_check(gs, player, expected_boosts)
+
+		for index, boost_name in enumerate(ACTIVE_POKEMON_BOOST):
+			reset_and_check(gs, player, expected_boosts)
+
+			new_expected_boosts = [old_boost for old_boost in expected_boosts]
+			
+			gs.add_boost(player, boost_name, 3)
+			new_expected_boosts[index] = (boost_name, 0.75)
+			boosts = gs.all_boosts(player)
+			if set(new_expected_boosts) != set(boosts):
+				print('Unexpected boost values')
+				print(f'Expected {new_expected_boosts}')
+				print(f'Got {boosts}')
+
+			gs.add_boost(player, boost_name, 3)
+			new_expected_boosts[index] = (boost_name, 1.0)
+			boosts = gs.all_boosts(player)
+			if set(new_expected_boosts) != set(boosts):
+				print('Unexpected boost values')
+				print(f'Expected {new_expected_boosts}')
+				print(f'Got {boosts}')
+
+			gs.add_boost(player, boost_name, 3)
+			new_expected_boosts[index] = (boost_name, 1.0)
+			boosts = gs.all_boosts(player)
+			if set(new_expected_boosts) != set(boosts):
+				print('Unexpected boost values')
+				print(f'Expected {new_expected_boosts}')
+				print(f'Got {boosts}')
+
+			gs.add_boost(player, boost_name, -3)
+			new_expected_boosts[index] = (boost_name, 0.75)
+			boosts = gs.all_boosts(player)
+			if set(new_expected_boosts) != set(boosts):
+				print('Unexpected boost values')
+				print(f'Expected {new_expected_boosts}')
+				print(f'Got {boosts}')
+
+			gs.add_boost(player, boost_name, -3)
+			new_expected_boosts[index] = (boost_name, 0.5)
+			boosts = gs.all_boosts(player)
+			if set(new_expected_boosts) != set(boosts):
+				print('Unexpected boost values')
+				print(f'Expected {new_expected_boosts}')
+				print(f'Got {boosts}')
+
+			gs.add_boost(player, boost_name, -3)
+			new_expected_boosts[index] = (boost_name, 0.25)
+			boosts = gs.all_boosts(player)
+			if set(new_expected_boosts) != set(boosts):
+				print('Unexpected boost values')
+				print(f'Expected {new_expected_boosts}')
+				print(f'Got {boosts}')
+
+			gs.add_boost(player, boost_name, -3)
+			new_expected_boosts[index] = (boost_name, 0.0)
+			boosts = gs.all_boosts(player)
+			if set(new_expected_boosts) != set(boosts):
+				print('Unexpected boost values')
+				print(f'Expected {new_expected_boosts}')
+				print(f'Got {boosts}')
+
+			gs.add_boost(player, boost_name, -3)
+			new_expected_boosts[index] = (boost_name, 0.0)
+			boosts = gs.all_boosts(player)
+			if set(new_expected_boosts) != set(boosts):
+				print('Unexpected boost values')
+				print(f'Expected {new_expected_boosts}')
+				print(f'Got {boosts}')
+			
+			break
