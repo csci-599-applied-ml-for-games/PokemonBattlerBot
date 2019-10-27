@@ -51,7 +51,8 @@ ACTIVE_POKEMON_BOOST = {
 	'spd': increment_team_index(),
 	'spe': increment_team_index(),
 	'accuracy': increment_team_index(),
-	'evasion': increment_team_index()
+	'evasion': increment_team_index(), 
+	'NotFound': increment_team_index()
 }
 TEAM_ATTRIBUTES_COUNT = TEAM_INDEX_TRACKER + 1
 MAX_BOOST = 12.0
