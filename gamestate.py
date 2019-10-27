@@ -139,20 +139,22 @@ NORMALIZED_HEALTH = increment_index()
 
 ATTRIBUTES_PER_POKEMON = INDEX_TRACKER + 1
 
+def start_of_pokemon(player, team_position):
+	return (SHARED_ATTRIBUTES_COUNT + 
+		player * GameState.num_player_elements + 
+		team_position * ATTRIBUTES_PER_POKEMON)
+
 def health_sum(vector_list, player):
 	total = 0
 	for position in range(GameState.max_team_size):
-		total += vector_list[SHARED_ATTRIBUTES_COUNT + 
-			player * GameState.num_player_elements +
-			position * ATTRIBUTES_PER_POKEMON + NORMALIZED_HEALTH]
+		total += vector_list[start_of_pokemon(player, position) + 
+			NORMALIZED_HEALTH]
 	return total
 
 def ko_count(vector_list, player):
 	total = 0
 	for position in range(GameState.max_team_size):
-		total += vector_list[SHARED_ATTRIBUTES_COUNT + 
-			player * GameState.num_player_elements +
-			position * ATTRIBUTES_PER_POKEMON + FAINTED_STATE]
+		total += vector_list[start_of_pokemon(player, position) + FAINTED_STATE]
 	return total
 
 class GameState():
@@ -187,19 +189,14 @@ class GameState():
 			WEATHER_NAME_TO_INDEX['NotFound'])
 		self.vector_list[position] = value
 
-	def start_of_pokemon(self, player, team_position):
-		return (SHARED_ATTRIBUTES_COUNT + 
-			player * GameState.num_player_elements + 
-			team_position * ATTRIBUTES_PER_POKEMON)
-
 	def set_pokemon_attribute(self, player, team_position, attribute_index, 
 		value):
 		
-		self.vector_list[self.start_of_pokemon(player, team_position) + 
+		self.vector_list[start_of_pokemon(player, team_position) + 
 			attribute_index] = value
 
 	def get_pokemon_attribute(self, player, team_position, attribute_index):
-		return self.vector_list[self.start_of_pokemon(player, team_position) 
+		return self.vector_list[start_of_pokemon(player, team_position) 
 			+ attribute_index]
 
 	def set_weather(self, weather_name):
@@ -280,7 +277,7 @@ class GameState():
 		player: member of Player enum
 		position: the position that the pokemon takes on the team. zero-indexed
 		'''
-		start_checking = self.start_of_pokemon(player, position) 
+		start_checking = start_of_pokemon(player, position) 
 		end_checking = start_checking + POKEMON_NAME_TO_INDEX['Count']
 		for pokemon_index in range(start_checking, end_checking):
 			if self.vector_list[pokemon_index] == 1.0:
@@ -372,11 +369,11 @@ class GameState():
 		name = GameState.pokemon_name_clean(name)
 		moves = []
 		position = self.name_to_position[player][name]
-		start_checking = (self.start_of_pokemon(player, position) + 
+		start_checking = (start_of_pokemon(player, position) + 
 			MOVE_NAME_TO_INDEX['Min'])
 		end_checking = start_checking + MOVE_NAME_TO_INDEX['Count']
 
-		start_of_move_indices = self.start_of_pokemon(player, position)
+		start_of_move_indices = start_of_pokemon(player, position)
 		for move_index in range(start_checking, end_checking):
 			if self.vector_list[move_index] == 1.0:
 				moves.append(INDEX_TO_MOVE_NAME[move_index - 
@@ -399,11 +396,11 @@ class GameState():
 		name = GameState.pokemon_name_clean(name)
 		types = []
 		position = self.name_to_position[player][name]
-		start_checking = (self.start_of_pokemon(player, position) + 
+		start_checking = (start_of_pokemon(player, position) + 
 			TYPE_NAME_TO_INDEX['Min'])
 		end_checking = start_checking + TYPE_NAME_TO_INDEX['Count']
 		
-		start_of_type_indices = self.start_of_pokemon(player, position)
+		start_of_type_indices = start_of_pokemon(player, position)
 		
 		for type_index in range(start_checking, end_checking):
 			if self.vector_list[type_index] == 1.0:
@@ -428,11 +425,11 @@ class GameState():
 		name = GameState.pokemon_name_clean(name)
 		statuses = []
 		position = self.name_to_position[player][name]
-		start_checking = (self.start_of_pokemon(player, position) + 
+		start_checking = (start_of_pokemon(player, position) + 
 			STATUS_NAME_TO_INDEX['Min'])
 		end_checking = start_checking + STATUS_NAME_TO_INDEX['Count']
 		
-		start_of_status_indices = self.start_of_pokemon(player, position)
+		start_of_status_indices = start_of_pokemon(player, position)
 		
 		for status_index in range(start_checking, end_checking):
 			if self.vector_list[status_index] == 1.0:
