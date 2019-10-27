@@ -327,6 +327,9 @@ class BotClient(showdown.Client):
 					self.gs.init_health(GameState.Player.one)
 					self.gs.init_health(GameState.Player.two)
 
+					self.gs.reset_boosts(GameState.Player.one)
+					self.gs.reset_boosts(GameState.Player.two)
+
 					#NOTE: Select starting pokemon here 
 					start_index = random.randint(1, self.teamsize)
 					await room_obj.start_poke(start_index)
@@ -350,6 +353,9 @@ class BotClient(showdown.Client):
 				self.turn_number = int(params[0])
 				
 				self.log(f'Weather: {self.gs.all_weather()}')
+
+				self.log(f'P1 Boosts: {self.gs.all_boosts(GameState.Player.one)}')
+				self.log(f'P2 Boosts: {self.gs.all_boosts(GameState.Player.two)}')
 
 				active_pokemon = self.gs.all_active(GameState.Player.one)
 				self.log(f'P1 active: {active_pokemon}')
@@ -513,6 +519,9 @@ class BotClient(showdown.Client):
 				else:
 					pokemon_name = self.opp_active_pokemon
 					gs_player = GameState.Player.two
+
+				self.gs.reset_boosts(gs_player)
+				
 				if pokemon_name != None:
 					for volatile_status in volatile_statuses:
 						self.remove_status(gs_player, pokemon_name, 
@@ -753,6 +762,27 @@ class BotClient(showdown.Client):
 					self.gs.clear_all_weather()
 				else:
 					self.gs.set_weather(weather_name)
+
+			elif inp_type == '-boost':
+				mine = params[0].startswith(self.position)
+				if mine:
+					gs_player = GameState.Player.one
+				else:
+					gs_player = GameState.Player.two
+				boost_name = params[1]
+				stages = float(params[2])
+				self.gs.add_boost(gs_player, boost_name, stages)
+
+			elif inp_type == '-unboost':
+				mine = params[0].startswith(self.position)
+				if mine:
+					gs_player = GameState.Player.one
+				else:
+					gs_player = GameState.Player.two
+				boost_name = params[1]
+				stages = float(params[2])
+				self.gs.add_boost(gs_player, boost_name, -1 * stages)
+
 		else:
 			if inp_type == 'updateuser':
 				if (self.name == params[0].strip() and self.challenge and 
