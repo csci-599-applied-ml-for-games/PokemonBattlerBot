@@ -189,12 +189,13 @@ class GameState():
 
 	max_team_size = 6
 
-	num_player_elements = (SHARED_ATTRIBUTES_COUNT + TEAM_ATTRIBUTES_COUNT + 
+	num_player_elements = (TEAM_ATTRIBUTES_COUNT + 
 		max_team_size * ATTRIBUTES_PER_POKEMON)
 
 	@staticmethod
 	def vector_dimension():
-		return GameState.Player.count * GameState.num_player_elements
+		return (SHARED_ATTRIBUTES_COUNT + 
+			GameState.Player.count * GameState.num_player_elements)
 
 	def __init__(self):
 		self.vector_list = [0.0 for _ in range(GameState.vector_dimension())]
