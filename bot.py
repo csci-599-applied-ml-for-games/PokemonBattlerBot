@@ -213,13 +213,30 @@ class BotClient(showdown.Client):
 		return data['side']['pokemon']
 
 	async def switch_pokemon(self, room_obj, data):
+		'''
+		For use with forceswitch scenarios
+		'''
+		valid_actions = []
 		team_info = self.get_team_info(data)
-		switch_available = []
 		for pokemon_index, pokemon_info in enumerate(team_info):
-			if 'fnt' not in pokemon_info['condition']:
-				switch_available.append(pokemon_index + 1)
-		switch_index = random.choice(switch_available)
-		await room_obj.switch(switch_index)
+			fainted = 'fnt' in pokemon_info.get('condition')
+			if (not pokemon_info.get('active', False) and 
+				not fainted):
+
+				pokemon_name = self.gs.pokemon_name_clean(pokemon_info['details'])
+				valid_actions.append((pokemon_index + 1 , 
+					pokemon_name, 
+					ActionType.Switch))
+		
+		self.log(f'valid_actions: {valid_actions}')
+
+		action_index, action_string, action_type, _ = \
+			self.agent.get_action(self.gs.vector_list, valid_actions)
+
+		if action_type == ActionType.Switch:
+			await room_obj.switch(action_index)
+		else:
+			self.log(f'Unexpected action type {action_type}')
 
 	async def take_action(self, room_obj, data):
 		self.log(f'data: {data}')
@@ -420,13 +437,6 @@ class BotClient(showdown.Client):
 				self.log('team moves', self.team_moves)	
 				force_switch = data.get('forceSwitch', [False])[0]
 				if force_switch == True:
-					# switch_available = []
-					# for pokemon_index, pokemon_info in enumerate(team_info):
-					# 	if 'fnt' not in pokemon_info['condition']:
-					# 		switch_available.append(pokemon_index + 1)
-					# switch_index = random.choice(switch_available)
-					# await room_obj.switch(switch_index)
-
 					await self.switch_pokemon(room_obj, data)
 				else:
 					await self.take_action(room_obj, data)
