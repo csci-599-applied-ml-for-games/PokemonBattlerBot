@@ -347,9 +347,21 @@ class BotClient(showdown.Client):
 					self.gs.reset_boosts(GameState.Player.two)
 
 					#NOTE: Select starting pokemon here 
-					start_index = random.randint(1, self.teamsize)
-					await room_obj.start_poke(start_index)
+					valid_actions = []
+					for pokemon_index, pokemon_name in enumerate(self.team):
+						pokemon_name = self.gs.pokemon_name_clean(pokemon_name)
+						valid_actions.append((pokemon_index + 1 , 
+							pokemon_name, 
+							ActionType.Switch))
+					
+					action_index, action_string, action_type, _ = \
+						self.agent.get_action(self.gs.vector_list, valid_actions)
 
+					if action_type == ActionType.Switch:
+						await room_obj.start_poke(action_index)
+					else:
+						self.log(f'Unexpected action type {action_type}') 
+					
 			elif inp_type == 'teamsize':
 				position = params[0]
 				if position == self.position:
