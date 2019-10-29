@@ -432,37 +432,6 @@ class BotClient(showdown.Client):
 					await self.take_action(room_obj, data)
 			
 			elif inp_type == '-status':
-				'''
-				NOTE: statuses
-				brn
-				par
-				slp
-				frz
-				psn
-				tox
-				confusion
-				flinch
-				trapped
-				trapper
-				partiallytrapped
-				lockedmove
-				twoturnmove
-				choicelock
-				mustrecharge
-				futuremove
-				healreplacement
-				stall
-				gem
-				raindance
-				primordialsea
-				sunnyday
-				desolateland
-				sandstorm
-				hail
-				deltastream
-				arceus
-				silvally
-				'''
 				pokemon_data = params[0]
 				pokemon_name = self.get_pokemon(pokemon_data)
 				status = params[1]
