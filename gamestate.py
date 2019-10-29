@@ -227,13 +227,11 @@ class GameState():
 	def set_player_attribute(self, player, attribute_index, value):
 		self.vector_list[SHARED_ATTRIBUTES_COUNT + 
 			player * GameState.num_player_elements + 
-			TEAM_ATTRIBUTES_COUNT +
 			attribute_index] = value
 
 	def get_player_attribute(self, player, attribute_index):
 		return self.vector_list[SHARED_ATTRIBUTES_COUNT + 
 			player * GameState.num_player_elements + 
-			TEAM_ATTRIBUTES_COUNT +
 			attribute_index]
 
 	def set_pokemon_attribute(self, player, team_position, attribute_index, 
