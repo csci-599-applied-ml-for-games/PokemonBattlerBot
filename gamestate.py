@@ -518,19 +518,33 @@ class GameState():
 
 	def _set_entry_hazard(self, player, entry_hazard_position, value):
 		self.set_player_attribute(player, entry_hazard_position, value)
-	
-	def increment_entry_hazard(self, player, entry_hazard):
+
+	def set_entry_hazard(self, player, entry_hazard, value):
 		entry_hazard_position = ENTRY_HAZARD_TO_INDEX.get(entry_hazard, ENTRY_HAZARD_TO_INDEX['NotFound'])
-		current_entry_hazard = self.get_player_attribute(player, entry_hazard_position)
+		self._set_entry_hazard(player, entry_hazard_position, value)
+	
+	def get_entry_hazard(self, player, entry_hazard):
+		entry_hazard_position = ENTRY_HAZARD_TO_INDEX.get(entry_hazard, ENTRY_HAZARD_TO_INDEX['NotFound'])
+		return self.get_player_attribute(player, entry_hazard_position)
+
+	def increment_entry_hazard(self, player, entry_hazard):
+		current_entry_hazard = self.get_entry_hazard(player, entry_hazard)
 		if (current_entry_hazard + 1.0/MAX_ENTRY_HAZARD_COUNT) > 1.0:
-			self._set_entry_hazard(player, entry_hazard_position, 1.0)
+			self.set_entry_hazard(player, entry_hazard, 1.0)
 		
 		else:
-			self._set_entry_hazard(player, entry_hazard_position, current_entry_hazard + 1.0/MAX_ENTRY_HAZARD_COUNT)
+			self.set_entry_hazard(player, entry_hazard, current_entry_hazard + 1.0/MAX_ENTRY_HAZARD_COUNT)
 
 	def clear_entry_hazard(self, player, entry_hazard):
-		entry_hazard_position = ENTRY_HAZARD_TO_INDEX.get(entry_hazard, ENTRY_HAZARD_TO_INDEX['NotFound'])
-		self._set_entry_hazard(player, entry_hazard_position, 0.0)
+		self.set_entry_hazard(player, entry_hazard, 0.0)
+	
+	def all_entry_hazard(self, player):
+		entry_hazards = []
+		for entry_hazard in ENTRY_HAZARD_TO_INDEX:
+			if entry_hazard not in ['Min', 'Count']:
+				entry_hazards.append((entry_hazard, self.get_entry_hazard(player, entry_hazard)))
+
+		return entry_hazards
 
 	def update_abilities(self, player, pokemon, ability):
 		#TODO: replace implementation with packing into vector list
