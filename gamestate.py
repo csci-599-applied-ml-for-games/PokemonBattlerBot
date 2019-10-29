@@ -57,6 +57,18 @@ ACTIVE_POKEMON_BOOST = {
 	'NotFound': increment_team_index()
 }
 
+# Magic number to normalize the quantity of an entry hazard for 
+# input vactor. For eg. 3 spikes => 3/10 = 0.3 value in vector
+MAX_ENTRY_HAZARD_COUNT = 10
+ENTRY_HAZARD_TO_INDEX = {
+	'Spikes': increment_team_index(),
+	'Stealth Rock': increment_team_index(),
+	'Toxic Spikes': increment_team_index(),
+	'Sticky Web': increment_team_index(),
+	'NotFound': increment_team_index(),
+}
+_, INDEX_TO_ENTRY_HAZARD = attribute_dict_setup(ENTRY_HAZARD_TO_INDEX)
+
 TEAM_ATTRIBUTES_COUNT = TEAM_INDEX_TRACKER + 1
 
 POKEMON_NAME_TO_INDEX = {
