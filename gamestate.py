@@ -227,13 +227,13 @@ class GameState():
 	def set_player_attribute(self, player, attribute_index, value):
 		self.vector_list[SHARED_ATTRIBUTES_COUNT + 
 			player * GameState.num_player_elements + 
-			TEAM_ATTRIBUTES_COUNT +
+			0 +
 			attribute_index] = value
 
 	def get_player_attribute(self, player, attribute_index):
 		return self.vector_list[SHARED_ATTRIBUTES_COUNT + 
 			player * GameState.num_player_elements + 
-			TEAM_ATTRIBUTES_COUNT +
+			0 +
 			attribute_index]
 
 	def set_pokemon_attribute(self, player, team_position, attribute_index, 
@@ -517,27 +517,27 @@ class GameState():
 		for boost_name in ACTIVE_POKEMON_BOOST:
 			boosts.append((boost_name, self.get_boost(player, boost_name)))
 		return boosts
-		
+
 	def _set_entry_hazard(self, player, entry_hazard_position, value):
 		self.set_player_attribute(player, entry_hazard_position, value)
 	
 	def increment_entry_hazard(self, player, entry_hazard):
 		entry_hazard_position = ENTRY_HAZARD_TO_INDEX.get(entry_hazard, ENTRY_HAZARD_TO_INDEX['NotFound'])
 		current_entry_hazard = self.get_player_attribute(player, entry_hazard_position)
-		if (current_entry_hazard + 1/MAX_ENTRY_HAZARD_COUNT) > 1.0:
+		if (current_entry_hazard + 1.0/MAX_ENTRY_HAZARD_COUNT) > 1.0:
 			self._set_entry_hazard(player, entry_hazard_position, 1.0)
 		
 		else:
-			self._set_entry_hazard(player, entry_hazard_position, current_entry_hazard + 1/MAX_ENTRY_HAZARD_COUNT)
+			self._set_entry_hazard(player, entry_hazard_position, current_entry_hazard + 1.0/MAX_ENTRY_HAZARD_COUNT)
 
 	def decrement_entry_hazard(self, player, entry_hazard):
 		entry_hazard_position = ENTRY_HAZARD_TO_INDEX.get(entry_hazard, ENTRY_HAZARD_TO_INDEX['NotFound'])
 		current_entry_hazard = self.get_player_attribute(player, entry_hazard_position)
-		if (current_entry_hazard - 1/MAX_ENTRY_HAZARD_COUNT) < 0.0:
+		if (current_entry_hazard - 1.0/MAX_ENTRY_HAZARD_COUNT) < 0.0:
 			self._set_entry_hazard(player, entry_hazard_position, 0.0)
 		
 		else:
-			self._set_entry_hazard(player, entry_hazard_position, current_entry_hazard - 1/MAX_ENTRY_HAZARD_COUNT)
+			self._set_entry_hazard(player, entry_hazard_position, current_entry_hazard - 1.0/MAX_ENTRY_HAZARD_COUNT)
 
 	def update_abilities(self, player, pokemon, ability):
 		#TODO: replace implementation with packing into vector list
@@ -891,3 +891,67 @@ if __name__ == '__main__':
 				print(f'Got {boosts}')
 			
 			break
+	
+	# Test case for entry hazard names
+	test_entry_hazards = ['Spikes', 'Toxic Spikes', 'Stealth Rock', 'Sticky Web']
+	for entry_hazard in ENTRY_HAZARD_TO_INDEX.keys():
+		if entry_hazard not in test_entry_hazards and entry_hazard not in ['Min', 'Count', 'NotFound']:
+			print(f'Unexpected entry hazard: {entry_hazard}')
+
+	# Test case entry hazard increment and decrement
+	for player in GameState.Player:
+		if player == GameState.Player.count:
+			continue 
+
+		# Increment entry hazard value once for all entry hazards
+		for entry_hazard in test_entry_hazards:
+			gs.increment_entry_hazard(player, entry_hazard)
+		
+		# Check incremented value with expected value
+		for entry_hazard in test_entry_hazards:
+			expected_entry_hazard_value = 1.0/MAX_ENTRY_HAZARD_COUNT
+			actual_entry_hazard_value = gs.get_player_attribute(player, ENTRY_HAZARD_TO_INDEX[entry_hazard])
+			if expected_entry_hazard_value != actual_entry_hazard_value:
+				print(f'Unexpected entry_hazard_increment for player {player}')
+				print(f'Expected: {expected_entry_hazard_value} value for {entry_hazard}')
+				print(f'Got: {actual_entry_hazard_value} value for {entry_hazard}')
+		
+		# Decrement entry hazard value once for all entry hazards
+		for entry_hazard in test_entry_hazards:
+			gs.decrement_entry_hazard(player, entry_hazard)
+		
+		# Check decremented value with expected value (= 0.0)
+		for entry_hazard in test_entry_hazards:
+			expected_entry_hazard_value = 0.0
+			actual_entry_hazard_value = gs.get_player_attribute(player, ENTRY_HAZARD_TO_INDEX[entry_hazard])
+			if expected_entry_hazard_value != actual_entry_hazard_value:
+				print(f'Unexpected entry_hazard_decrement for {player}')
+				print(f'Expected: {expected_entry_hazard_value} value for player {entry_hazard}')
+				print(f'Got: {actual_entry_hazard_value} value for {entry_hazard}')
+		
+		# Decrement entry hazard value (from 0.0) to have it negative
+		for entry_hazard in test_entry_hazards:
+			gs.decrement_entry_hazard(player, entry_hazard)
+		
+		# Check entry hazard value can't be lower than 0.0
+		for entry_hazard in test_entry_hazards:
+			expected_entry_hazard_value = 0.0
+			actual_entry_hazard_value = gs.get_player_attribute(player, ENTRY_HAZARD_TO_INDEX[entry_hazard])
+			if expected_entry_hazard_value != actual_entry_hazard_value:
+				print(f'Unexpected entry_hazard_decrement for {player}, got < 0.0 value')
+				print(f'Expected: {expected_entry_hazard_value} value for player {entry_hazard}')
+				print(f'Got: {actual_entry_hazard_value} value for {entry_hazard}')
+		
+		# Increment entry hazard value MAX_ENTRY_HAZARD_COUNT + 1 times to check entry hazard value can't exceed 1.0
+		for entry_hazard in test_entry_hazards:
+			for _ in range(MAX_ENTRY_HAZARD_COUNT + 1):
+				gs.increment_entry_hazard(player, entry_hazard)	
+		
+		# Check max entry hazard value can be 1.0
+		for entry_hazard in test_entry_hazards:
+			expected_entry_hazard_value = 1.0
+			actual_entry_hazard_value = gs.get_player_attribute(player, ENTRY_HAZARD_TO_INDEX[entry_hazard])
+			if expected_entry_hazard_value != actual_entry_hazard_value:
+				print(f'Unexpected entry_hazard_increment for player {player}, got > 1.0 value')
+				print(f'Expected: {expected_entry_hazard_value} value for {entry_hazard}')
+				print(f'Got: {actual_entry_hazard_value} value for {entry_hazard}')
