@@ -517,6 +517,27 @@ class GameState():
 		for boost_name in ACTIVE_POKEMON_BOOST:
 			boosts.append((boost_name, self.get_boost(player, boost_name)))
 		return boosts
+		
+	def _set_entry_hazard(self, player, entry_hazard_position, value):
+		self.set_player_attribute(player, entry_hazard_position, value)
+	
+	def increment_entry_hazard(self, player, entry_hazard):
+		entry_hazard_position = ENTRY_HAZARD_TO_INDEX.get(entry_hazard, ENTRY_HAZARD_TO_INDEX['NotFound'])
+		current_entry_hazard = self.get_player_attribute(player, entry_hazard_position)
+		if (current_entry_hazard + 1/MAX_ENTRY_HAZARD_COUNT) > 1.0:
+			self._set_entry_hazard(player, entry_hazard_position, 1.0)
+		
+		else:
+			self._set_entry_hazard(player, entry_hazard_position, current_entry_hazard + 1/MAX_ENTRY_HAZARD_COUNT)
+
+	def decrement_entry_hazard(self, player, entry_hazard):
+		entry_hazard_position = ENTRY_HAZARD_TO_INDEX.get(entry_hazard, ENTRY_HAZARD_TO_INDEX['NotFound'])
+		current_entry_hazard = self.get_player_attribute(player, entry_hazard_position)
+		if (current_entry_hazard - 1/MAX_ENTRY_HAZARD_COUNT) < 0.0:
+			self._set_entry_hazard(player, entry_hazard_position, 0.0)
+		
+		else:
+			self._set_entry_hazard(player, entry_hazard_position, current_entry_hazard - 1/MAX_ENTRY_HAZARD_COUNT)
 
 	def update_abilities(self, player, pokemon, ability):
 		#TODO: replace implementation with packing into vector list
