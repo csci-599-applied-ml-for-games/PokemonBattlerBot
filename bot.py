@@ -553,8 +553,11 @@ class BotClient(showdown.Client):
 				hazard = params[1].lstrip('move: ')
 				if position.startswith(self.position):
 					self.sidestart.append(hazard)
+					self.gs.increment_entry_hazard(GameState.Player.one, hazard)
+
 				else:
 					self.opp_sidestart.append(hazard)
+					self.gs.increment_entry_hazard(GameState.Player.two, hazard)
 
 				self.log('Self sidestart', self.sidestart)
 				self.log('Opp sidestart', self.opp_sidestart)
@@ -564,11 +567,15 @@ class BotClient(showdown.Client):
 				if position.startswith(self.position):
 					try:
 						self.sidestart.remove(params[1])
+						self.gs.decrement_entry_hazard(GameState.Player.one, params[1])
+
 					except ValueError:
 						pass
 				else:
 					try:
 						self.opp_sidestart.remove(params[1])
+						self.gs.decrement_entry_hazard(GameState.Player.two, params[1])
+						
 					except ValueError:
 						pass
 
