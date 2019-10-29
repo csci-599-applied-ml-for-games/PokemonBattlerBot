@@ -16,6 +16,13 @@ def increment_shared_index():
 	SHARED_INDEX_TRACKER += 1
 	return SHARED_INDEX_TRACKER
 
+TEAM_INDEX_TRACKER = 0
+def increment_team_index():
+	global TEAM_INDEX_TRACKER
+	TEAM_INDEX_TRACKER += 1
+	return TEAM_INDEX_TRACKER
+
+
 def attribute_dict_setup(attribute_dict):
 	reversed_dict = {v: k for k, v in attribute_dict.items()}
 	our_min = min([v for k, v in attribute_dict.items()])
@@ -33,17 +40,12 @@ WEATHER_NAME_TO_INDEX = {
 	'DeltaStream': increment_shared_index(),
 	'NotFound': increment_shared_index()
 }
-
 _, INDEX_TO_WEATHER_NAME = attribute_dict_setup(WEATHER_NAME_TO_INDEX)
 
 SHARED_ATTRIBUTES_COUNT = SHARED_INDEX_TRACKER + 1
 
-TEAM_INDEX_TRACKER = 0
-def increment_team_index():
-	global TEAM_INDEX_TRACKER
-	TEAM_INDEX_TRACKER += 1
-	return TEAM_INDEX_TRACKER
-
+MAX_BOOST = 12.0
+MIN_BOOST = 0.0
 ACTIVE_POKEMON_BOOST = {
 	'atk': TEAM_INDEX_TRACKER,
 	'def': increment_team_index(),
@@ -54,9 +56,8 @@ ACTIVE_POKEMON_BOOST = {
 	'evasion': increment_team_index(), 
 	'NotFound': increment_team_index()
 }
+
 TEAM_ATTRIBUTES_COUNT = TEAM_INDEX_TRACKER + 1
-MAX_BOOST = 12.0
-MIN_BOOST = 0.0
 
 POKEMON_NAME_TO_INDEX = {
 	'Pelipper': INDEX_TRACKER,
