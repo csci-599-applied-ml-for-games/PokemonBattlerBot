@@ -552,35 +552,19 @@ class BotClient(showdown.Client):
 				position = params[0].split(':')[0]
 				hazard = params[1].lstrip('move: ')
 				if position.startswith(self.position):
-					self.sidestart.append(hazard)
 					self.gs.increment_entry_hazard(GameState.Player.one, hazard)
 
 				else:
-					self.opp_sidestart.append(hazard)
 					self.gs.increment_entry_hazard(GameState.Player.two, hazard)
-
-				self.log('Self sidestart', self.sidestart)
-				self.log('Opp sidestart', self.opp_sidestart)
 
 			elif inp_type == '-sideend':
 				position = params[0].split(':')[0]
+				hazard = params[1]
 				if position.startswith(self.position):
-					try:
-						self.sidestart.remove(params[1])
-						self.gs.decrement_entry_hazard(GameState.Player.one, params[1])
-
-					except ValueError:
-						pass
+					self.gs.clear_entry_hazard(GameState.Player.one, hazard)
+				
 				else:
-					try:
-						self.opp_sidestart.remove(params[1])
-						self.gs.decrement_entry_hazard(GameState.Player.two, params[1])
-						
-					except ValueError:
-						pass
-
-				self.log('Self sidestart', self.sidestart)
-				self.log('Opp sidestart', self.opp_sidestart)
+					self.gs.clear_entry_hazard(GameState.Player.two, hazard)
 
 			elif inp_type == 'error':
 				self.save_replay(room_obj)
@@ -823,11 +807,7 @@ class BotClient(showdown.Client):
 		if room_obj.id.startswith('battle-'):
 			self.log(f'Room ID: {room_obj.id}')
 			self.active_pokemon = None
-			self.sidestart = []
-
 			self.opp_active_pokemon = None
-			self.opp_sidestart = []
-
 			self.weather = 'none'
 
 def main():
