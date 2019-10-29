@@ -16,6 +16,13 @@ def increment_shared_index():
 	SHARED_INDEX_TRACKER += 1
 	return SHARED_INDEX_TRACKER
 
+TEAM_INDEX_TRACKER = 0
+def increment_team_index():
+	global TEAM_INDEX_TRACKER
+	TEAM_INDEX_TRACKER += 1
+	return TEAM_INDEX_TRACKER
+
+
 def attribute_dict_setup(attribute_dict):
 	reversed_dict = {v: k for k, v in attribute_dict.items()}
 	our_min = min([v for k, v in attribute_dict.items()])
@@ -33,17 +40,12 @@ WEATHER_NAME_TO_INDEX = {
 	'DeltaStream': increment_shared_index(),
 	'NotFound': increment_shared_index()
 }
-
 _, INDEX_TO_WEATHER_NAME = attribute_dict_setup(WEATHER_NAME_TO_INDEX)
 
 SHARED_ATTRIBUTES_COUNT = SHARED_INDEX_TRACKER + 1
 
-TEAM_INDEX_TRACKER = 0
-def increment_team_index():
-	global TEAM_INDEX_TRACKER
-	TEAM_INDEX_TRACKER += 1
-	return TEAM_INDEX_TRACKER
-
+MAX_BOOST = 12.0
+MIN_BOOST = 0.0
 ACTIVE_POKEMON_BOOST = {
 	'atk': TEAM_INDEX_TRACKER,
 	'def': increment_team_index(),
@@ -54,9 +56,20 @@ ACTIVE_POKEMON_BOOST = {
 	'evasion': increment_team_index(), 
 	'NotFound': increment_team_index()
 }
+
+# Magic number to normalize the quantity of an entry hazard for 
+# input vactor. For eg. 3 spikes => 3/10 = 0.3 value in vector
+MAX_ENTRY_HAZARD_COUNT = 10
+ENTRY_HAZARD_TO_INDEX = {
+	'Spikes': increment_team_index(),
+	'Stealth Rock': increment_team_index(),
+	'Toxic Spikes': increment_team_index(),
+	'Sticky Web': increment_team_index(),
+	'NotFound': increment_team_index(),
+}
+_, INDEX_TO_ENTRY_HAZARD = attribute_dict_setup(ENTRY_HAZARD_TO_INDEX)
+
 TEAM_ATTRIBUTES_COUNT = TEAM_INDEX_TRACKER + 1
-MAX_BOOST = 12.0
-MIN_BOOST = 0.0
 
 POKEMON_NAME_TO_INDEX = {
 	'Pelipper': INDEX_TRACKER,
@@ -214,13 +227,11 @@ class GameState():
 	def set_player_attribute(self, player, attribute_index, value):
 		self.vector_list[SHARED_ATTRIBUTES_COUNT + 
 			player * GameState.num_player_elements + 
-			TEAM_ATTRIBUTES_COUNT +
 			attribute_index] = value
 
 	def get_player_attribute(self, player, attribute_index):
 		return self.vector_list[SHARED_ATTRIBUTES_COUNT + 
 			player * GameState.num_player_elements + 
-			TEAM_ATTRIBUTES_COUNT +
 			attribute_index]
 
 	def set_pokemon_attribute(self, player, team_position, attribute_index, 
@@ -504,6 +515,22 @@ class GameState():
 		for boost_name in ACTIVE_POKEMON_BOOST:
 			boosts.append((boost_name, self.get_boost(player, boost_name)))
 		return boosts
+
+	def _set_entry_hazard(self, player, entry_hazard_position, value):
+		self.set_player_attribute(player, entry_hazard_position, value)
+	
+	def increment_entry_hazard(self, player, entry_hazard):
+		entry_hazard_position = ENTRY_HAZARD_TO_INDEX.get(entry_hazard, ENTRY_HAZARD_TO_INDEX['NotFound'])
+		current_entry_hazard = self.get_player_attribute(player, entry_hazard_position)
+		if (current_entry_hazard + 1.0/MAX_ENTRY_HAZARD_COUNT) > 1.0:
+			self._set_entry_hazard(player, entry_hazard_position, 1.0)
+		
+		else:
+			self._set_entry_hazard(player, entry_hazard_position, current_entry_hazard + 1.0/MAX_ENTRY_HAZARD_COUNT)
+
+	def clear_entry_hazard(self, player, entry_hazard):
+		entry_hazard_position = ENTRY_HAZARD_TO_INDEX.get(entry_hazard, ENTRY_HAZARD_TO_INDEX['NotFound'])
+		self._set_entry_hazard(player, entry_hazard_position, 0.0)
 
 	def update_abilities(self, player, pokemon, ability):
 		#TODO: replace implementation with packing into vector list
@@ -857,3 +884,54 @@ if __name__ == '__main__':
 				print(f'Got {boosts}')
 			
 			break
+	
+	# Test case for entry hazard names
+	test_entry_hazards = ['Spikes', 'Toxic Spikes', 'Stealth Rock', 'Sticky Web']
+	for entry_hazard in ENTRY_HAZARD_TO_INDEX.keys():
+		if entry_hazard not in test_entry_hazards and entry_hazard not in ['Min', 'Count', 'NotFound']:
+			print(f'Unexpected entry hazard: {entry_hazard}')
+
+	# Test case entry hazard increment and decrement
+	for player in GameState.Player:
+		if player == GameState.Player.count:
+			continue 
+
+		# Increment entry hazard value once for all entry hazards
+		for entry_hazard in test_entry_hazards:
+			gs.increment_entry_hazard(player, entry_hazard)
+		
+		# Check incremented value with expected value
+		for entry_hazard in test_entry_hazards:
+			expected_entry_hazard_value = 1.0/MAX_ENTRY_HAZARD_COUNT
+			actual_entry_hazard_value = gs.get_player_attribute(player, ENTRY_HAZARD_TO_INDEX[entry_hazard])
+			if expected_entry_hazard_value != actual_entry_hazard_value:
+				print(f'Unexpected entry_hazard_increment for player {player}')
+				print(f'Expected: {expected_entry_hazard_value} value for {entry_hazard}')
+				print(f'Got: {actual_entry_hazard_value} value for {entry_hazard}')
+		
+		# clear entry hazard value once for all entry hazards
+		for entry_hazard in test_entry_hazards:
+			gs.clear_entry_hazard(player, entry_hazard)
+		
+		# Check cleared value with expected value (= 0.0)
+		for entry_hazard in test_entry_hazards:
+			expected_entry_hazard_value = 0.0
+			actual_entry_hazard_value = gs.get_player_attribute(player, ENTRY_HAZARD_TO_INDEX[entry_hazard])
+			if expected_entry_hazard_value != actual_entry_hazard_value:
+				print(f'Unexpected entry_hazard_clear for {player}')
+				print(f'Expected: {expected_entry_hazard_value} value for player {entry_hazard}')
+				print(f'Got: {actual_entry_hazard_value} value for {entry_hazard}')
+				
+		# Increment entry hazard value MAX_ENTRY_HAZARD_COUNT + 1 times to check entry hazard value can't exceed 1.0
+		for entry_hazard in test_entry_hazards:
+			for _ in range(MAX_ENTRY_HAZARD_COUNT + 1):
+				gs.increment_entry_hazard(player, entry_hazard)	
+		
+		# Check max entry hazard value can be 1.0
+		for entry_hazard in test_entry_hazards:
+			expected_entry_hazard_value = 1.0
+			actual_entry_hazard_value = gs.get_player_attribute(player, ENTRY_HAZARD_TO_INDEX[entry_hazard])
+			if expected_entry_hazard_value != actual_entry_hazard_value:
+				print(f'Unexpected entry_hazard_increment for player {player}, got > 1.0 value')
+				print(f'Expected: {expected_entry_hazard_value} value for {entry_hazard}')
+				print(f'Got: {actual_entry_hazard_value} value for {entry_hazard}')
