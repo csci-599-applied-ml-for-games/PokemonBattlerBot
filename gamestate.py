@@ -84,27 +84,27 @@ POKEMON_NAME_TO_INDEX = {
 _, INDEX_TO_POKEMON_NAME = attribute_dict_setup(POKEMON_NAME_TO_INDEX)
 
 MOVE_NAME_TO_INDEX = {
-	'Knock Off': increment_index(),
-	'U-turn': increment_index(),
-	'Scald': increment_index(),
-	'Roost': increment_index(),
-	'Hydro Pump': increment_index(),  
-	'Dark Pulse': increment_index(),
-	'Water Shuriken': increment_index(),
-	'Spikes': increment_index(),
-	'Waterfall': increment_index(),
-	'Earthquake': increment_index(),
-	'Ice Punch': increment_index(),
-	'Superpower': increment_index(),
-	'Tail Glow': increment_index(),
-	'Surf': increment_index(),
-	'Ice Beam': increment_index(),
-	'Rest': increment_index(), 
-	'Stealth Rock': increment_index(),
-	'Toxic': increment_index(),
-	'Power Whip': increment_index(),
-	'Hurricane': increment_index(),
-	'Defog': increment_index(),
+	'knockoff': increment_index(),
+	'uturn': increment_index(),
+	'scald': increment_index(),
+	'roost': increment_index(),
+	'hydropump': increment_index(),  
+	'darkpulse': increment_index(),
+	'watershuriken': increment_index(),
+	'spikes': increment_index(),
+	'waterfall': increment_index(),
+	'earthquake': increment_index(),
+	'icepunch': increment_index(),
+	'superpower': increment_index(),
+	'tailglow': increment_index(),
+	'surf': increment_index(),
+	'icebeam': increment_index(),
+	'rest': increment_index(), 
+	'stealthrock': increment_index(),
+	'toxic': increment_index(),
+	'powerwhip': increment_index(),
+	'hurricane': increment_index(),
+	'defog': increment_index(),
 	'NotFound': increment_index(),
 }
 _, INDEX_TO_MOVE_NAME = attribute_dict_setup(MOVE_NAME_TO_INDEX)
@@ -422,6 +422,13 @@ class GameState():
 					start_of_move_indices])
 		return moves
 
+	def all_moves(self, player):
+		all_moves = []
+		team = self.name_to_position[player]
+		for name in team:
+			all_moves.append((name, self.check_moves(player, name)))
+		return all_moves
+
 	def _set_type(self, player, position, type_position, value):
 		self.set_pokemon_attribute(player, position, type_position, value)
 
@@ -449,6 +456,13 @@ class GameState():
 				types.append(INDEX_TO_TYPE_NAME[type_index - 
 					start_of_type_indices])
 		return types
+
+	def all_types(self, player):
+		all_types = []
+		team = self.name_to_position[player]
+		for name in team:
+			all_types.append((name, self.check_types(player, name)))
+		return all_types
 	
 	def _set_status(self, player, team_position, status_position, value):
 		self.set_pokemon_attribute(player, team_position, status_position, value)

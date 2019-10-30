@@ -401,8 +401,14 @@ class BotClient(showdown.Client):
 				self.log(f'P1 fainted: {self.gs.all_fainted(GameState.Player.one)}')
 				self.log(f'P2 fainted: {self.gs.all_fainted(GameState.Player.two)}')
 
+				self.log(f'P1 types: {self.gs.all_types(GameState.Player.one)}')
+				self.log(f'P2 types: {self.gs.all_types(GameState.Player.two)}')
+
 				self.log(f'P1 statuses: {self.gs.all_statuses(GameState.Player.one)}')
 				self.log(f'P2 statuses: {self.gs.all_statuses(GameState.Player.two)}')
+
+				self.log(f'P1 moves: {self.gs.all_moves(GameState.Player.one)}')
+				self.log(f'P2 moves: {self.gs.all_moves(GameState.Player.two)}')
 
 				if self.turn_number == 1:
 					self.state_vl = self.gs.vector_list
@@ -429,7 +435,6 @@ class BotClient(showdown.Client):
 				team_info = self.get_team_info(data)
 				self.team_abilities = {}
 				self.team_items = {}
-				self.team_moves = {}
 				for pokemon_info in team_info:
 					self.log('info', pokemon_info)
 					pokemon_name = GameState.pokemon_name_clean(pokemon_info['details'])
@@ -437,16 +442,11 @@ class BotClient(showdown.Client):
 					self.team_abilities[pokemon_name] = pokemon_info['ability']
 					# track the items each pokemon
 					self.team_items[pokemon_name] = pokemon_info['item']
-					# track the team movelist?
-					self.team_moves[pokemon_name] = pokemon_info['moves']
-					# if pokemon_info.get('active'):
-						# self.active_pokemon = pokemon_info['details'].rstrip(', M').rstrip(', F')
-						# self.log('active_pokemon', self.active_pokemon)
-						# self.log('active_pokemon types', TYPE_MAP.get(self.active_pokemon))
-						#break // removed this line so it would get all the moves and stuff and things ya know
+					for move_name in pokemon_info['moves']:
+						self.gs.set_move(GameState.Player.one, pokemon_name, 
+							move_name)						
 				self.log('team abilities', self.team_abilities)
 				self.log('team items', self.team_items)
-				self.log('team moves', self.team_moves)	
 				force_switch = data.get('forceSwitch', [False])[0]
 				if force_switch == True:
 					await self.switch_pokemon(room_obj, data)
@@ -456,6 +456,9 @@ class BotClient(showdown.Client):
 			elif inp_type == '-status':
 				pokemon_data = params[0]
 				pokemon_name = self.get_pokemon(pokemon_data)
+				#TODO: remove this hack and have a good way of handling
+				#TODO: detailed vs. non-detailed pokemon names
+				pokemon_name = hack_name(pokemon_name)
 				status = params[1]
 				if self.own_pokemon(pokemon_data):
 					self.add_status(GameState.Player.one, pokemon_name, status)
