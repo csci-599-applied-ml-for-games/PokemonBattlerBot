@@ -456,6 +456,13 @@ class GameState():
 				types.append(INDEX_TO_TYPE_NAME[type_index - 
 					start_of_type_indices])
 		return types
+
+	def all_types(self, player):
+		all_types = []
+		team = self.name_to_position[player]
+		for name in team:
+			all_types.append((name, self.check_types(player, name)))
+		return all_types
 	
 	def _set_status(self, player, team_position, status_position, value):
 		self.set_pokemon_attribute(player, team_position, status_position, value)

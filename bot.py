@@ -401,6 +401,9 @@ class BotClient(showdown.Client):
 				self.log(f'P1 fainted: {self.gs.all_fainted(GameState.Player.one)}')
 				self.log(f'P2 fainted: {self.gs.all_fainted(GameState.Player.two)}')
 
+				self.log(f'P1 types: {self.gs.all_types(GameState.Player.one)}')
+				self.log(f'P2 types: {self.gs.all_types(GameState.Player.two)}')
+
 				self.log(f'P1 statuses: {self.gs.all_statuses(GameState.Player.one)}')
 				self.log(f'P2 statuses: {self.gs.all_statuses(GameState.Player.two)}')
 
@@ -440,10 +443,8 @@ class BotClient(showdown.Client):
 					# track the items each pokemon
 					self.team_items[pokemon_name] = pokemon_info['item']
 					for move_name in pokemon_info['moves']:
-						print(move_name)
 						self.gs.set_move(GameState.Player.one, pokemon_name, 
-							move_name)
-						print('set')
+							move_name)						
 				self.log('team abilities', self.team_abilities)
 				self.log('team items', self.team_items)
 				force_switch = data.get('forceSwitch', [False])[0]
@@ -455,6 +456,9 @@ class BotClient(showdown.Client):
 			elif inp_type == '-status':
 				pokemon_data = params[0]
 				pokemon_name = self.get_pokemon(pokemon_data)
+				#TODO: remove this hack and have a good way of handling
+				#TODO: detailed vs. non-detailed pokemon names
+				pokemon_name = hack_name(pokemon_name)
 				status = params[1]
 				if self.own_pokemon(pokemon_data):
 					self.add_status(GameState.Player.one, pokemon_name, status)
