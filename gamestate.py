@@ -825,7 +825,8 @@ if __name__ == '__main__':
 			('spd', 0.5), 
 			('spe', 0.5), 
 			('accuracy', 0.5), 
-			('evasion', 0.5)) 
+			('evasion', 0.5),
+			('NotFound', 0.5)) 
 		reset_and_check(gs, player, expected_boosts)
 
 		for index, boost_name in enumerate(ACTIVE_POKEMON_BOOST):
