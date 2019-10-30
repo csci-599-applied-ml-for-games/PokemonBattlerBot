@@ -201,11 +201,11 @@ class BotClient(showdown.Client):
 		replays_dir = os.path.join(BOT_DIR, 'replays')
 		if not os.path.exists(replays_dir):
 			os.mkdir(replays_dir)
-		
 		replay_file = f'{self.datestring}_Iteration{self.iterations_run}.html'
-		with open(os.path.join(replays_dir, replay_file), 'wt') as f:
+		with open(os.path.join(replays_dir, replay_file), 'wb') as f:
 			f.write(util.get_replay_header())
-			f.write('\n'.join(room_obj.logs))
+			joined = '\n'.join(room_obj.logs)
+			f.write('\n'.join(room_obj.logs).encode('utf-8'))
 			f.write(util.get_replay_footer())
 	
 	@staticmethod
@@ -568,8 +568,6 @@ class BotClient(showdown.Client):
 						await self.take_action(room_obj, self.last_request_data)
 
 			elif inp_type == 'win':
-				
-				self.save_replay(room_obj)
 				done = True
 				
 				winner = params[0]
@@ -607,11 +605,10 @@ class BotClient(showdown.Client):
 						self.agent.restart_epoch()
 				else:
 					self.log(f'Not trained')
-					
+				
 				await room_obj.leave()
 				self.iterations_run += 1
 				self.update_log_paths()
-				
 				if self.should_play_new_game():
 					self.log("Starting iteration {}".format(self.iterations_run))
 					if self.challenge:

@@ -12,7 +12,7 @@ def get_replay_header():
                 <input type="hidden" name="replayid" value="gen7ou-994810962" />
                 <div class="battle"></div><div class="battle-log"></div><div class="replay-controls"></div><div class="replay-controls-2"></div>
                 <script type="text/plain" class="battle-log-data">'''
-    return header
+    return header.encode('utf-8')
 
 
 def get_replay_footer():
@@ -23,4 +23,4 @@ def get_replay_footer():
                 <script>
                 let daily = Math.floor(Date.now()/1000/60/60/24);document.write('<script src="https://play.pokemonshowdown.com/js/replay-embed.js?version'+daily+'"></'+'script>');
                 </script>'''
-    return footer
+    return footer.encode('utf-8')
