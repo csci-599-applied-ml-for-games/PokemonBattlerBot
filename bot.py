@@ -248,7 +248,7 @@ class BotClient(showdown.Client):
 		self.log(f'Moves: {moves}')
 		valid_actions = []
 		for move_index, move_data in enumerate(moves):
-			if (( 	.get('pp', 0) > 0 and not move_data.get('disabled'))
+			if (( move_data.get('pp', 0) > 0 and not move_data.get('disabled'))
 				or move_data.get('move') == 'Struggle'):
 				
 				valid_actions.append((move_index + 1, 
@@ -321,8 +321,8 @@ class BotClient(showdown.Client):
 				self.log(f'{vector_pokemon} has types {has_types}')
 
 	async def on_receive(self, room_id, inp_type, params):
-		self.log(f'Input type: {inp_type}')
-		self.log(f'Params: {params}')
+		# self.log(f'Input type: {inp_type}')
+		# self.log(f'Params: {params}')
 
 		room_obj = self.rooms.get(room_id)
 		if room_obj and room_obj.id.startswith('battle-'):
@@ -441,7 +441,7 @@ class BotClient(showdown.Client):
 				self.last_request_data = data
 
 				for pokemon_info in team_info:
-					self.log('BotClient: Pokemon_Info => {pokemon_info}')
+					self.log('BotClient: Pokemon_Info => ', pokemon_info)
 					pokemon_name = GameState.pokemon_name_clean(pokemon_info['details'])
 					
 					# Initialize all available pokemon moves for game stats
@@ -479,9 +479,9 @@ class BotClient(showdown.Client):
 						self.gs.clear_all_items(GameState.Player.one, pokemon_name)
 						self.gs.set_item(GameState.Player.one, pokemon_name, item)	
 
-				self.log(f'GameState Vector: MOVES => {self.gs.all_moves}')
-				self.log(f'GameState Vector: ITEMS => {self.gs.all_items}')
-				self.log(f'GameState Vector: STATS => {self.gs.all_stats}')
+				self.log(f'GameState Vector: MOVES => ', self.gs.all_moves())
+				self.log(f'GameState Vector: ITEMS => ', self.gs.all_items())
+				self.log(f'GameState Vector: STATS => ', self.gs.all_stats())
 
 				force_switch = data.get('forceSwitch', [False])[0]
 				if force_switch == True:
@@ -794,7 +794,7 @@ class BotClient(showdown.Client):
 					Actual tracking of this hook done based on changed
 					moves in 'request' inp_type
 				'''
-					self.log(params)
+				self.log('BotClient: Move => ', params)
 					
 
 			elif inp_type == '-zpower':
