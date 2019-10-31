@@ -431,15 +431,15 @@ class GameState():
 		move_position = MOVE_NAME_TO_INDEX.get(move_name, MOVE_NAME_TO_INDEX['NotFound'])
 		self._set_move(player, team_position, move_position, pp/max_pp)
 
-	def check_moves(self, player, name):
-		name = GameState.pokemon_name_clean(name)
+	def check_moves(self, player, pokemon_name):
+		pokemon_name = GameState.pokemon_name_clean(pokemon_name)
 		moves = []
-		position = self.name_to_position[player][name]
-		start_checking = (start_of_pokemon(player, position) + 
+		team_position = self.name_to_position[player][pokemon_name]
+		start_checking = (start_of_pokemon(player, team_position) + 
 			MOVE_NAME_TO_INDEX['Min'])
 		end_checking = start_checking + MOVE_NAME_TO_INDEX['Count']
 
-		start_of_move_indices = start_of_pokemon(player, position)
+		start_of_move_indices = start_of_pokemon(player, team_position)
 		for move_index in range(start_checking, end_checking):
 			if self.vector_list[move_index] == 1.0:
 				moves.append(INDEX_TO_MOVE_NAME[move_index - 
