@@ -483,13 +483,13 @@ class GameState():
 
 	def set_status(self, player, name, status_name):
 		team_position = self.name_to_position[player][name]
-		type_position = STATUS_NAME_TO_INDEX.get(status_name, STATUS_NAME_TO_INDEX['NotFound'])
-		self._set_status(player, team_position, type_position, 1.0)
+		status_position = STATUS_NAME_TO_INDEX.get(status_name, STATUS_NAME_TO_INDEX['NotFound'])
+		self._set_status(player, team_position, status_position, 1.0)
 	
 	def remove_status(self, player, name, status_name):
 		team_position = self.name_to_position[player][name]
-		type_position = STATUS_NAME_TO_INDEX.get(status_name, STATUS_NAME_TO_INDEX['NotFound'])
-		self._set_status(player, team_position, type_position, 0.0)
+		status_position = STATUS_NAME_TO_INDEX.get(status_name, STATUS_NAME_TO_INDEX['NotFound'])
+		self._set_status(player, team_position, status_position, 0.0)
 
 	def check_status(self, player, name):
 		name = GameState.pokemon_name_clean(name)
@@ -573,7 +573,7 @@ class GameState():
 				entry_hazards.append((entry_hazard, self.get_entry_hazard(player, entry_hazard)))
 
 		return entry_hazards
-		
+	
 	def update_abilities(self, player, pokemon, ability):
 		#TODO: replace implementation with packing into vector list
 		pokemon_name = GameState.pokemon_name_clean(str(pokemon))
