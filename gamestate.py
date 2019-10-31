@@ -177,6 +177,16 @@ STAT_NAME_TO_INDEX = {
 }
 _, INDEX_TO_STAT_NAME = attribute_dict_setup(STAT_NAME_TO_INDEX)
 
+ITEM_NAME_TO_INDEX = {
+	'damprock': increment_index(),
+	'choicespecs': increment_index(),
+	'swampertite': increment_index(),
+	'wateriumz': increment_index(),
+	'figyberry': increment_index(),
+	'rockyhelmet': increment_index(),
+	'NotFound': increment_index(),
+}
+_, INDEX_TO_ITEM_NAME = attribute_dict_setup(ITEM_NAME_TO_INDEX)
 
 ACTIVE_STATE = increment_index()
 
