@@ -164,6 +164,20 @@ STATUS_NAME_TO_INDEX = {
 }
 _, INDEX_TO_STATUS_NAME = attribute_dict_setup(STATUS_NAME_TO_INDEX)
 
+# Magic number to normalize stat values for input vector
+# For eg. 1245 spa => 1245/2000 = 0.6225 value in vector
+STAT_NORMALIZER = 2000
+STAT_NAME_TO_INDEX = {
+	'atk': increment_index(),
+	'def': increment_index(),
+	'spa': increment_index(),
+	'spd': increment_index(),
+	'spe': increment_index(),
+	'NotFound': increment_index(),
+}
+_, INDEX_TO_STAT_NAME = attribute_dict_setup(STAT_NAME_TO_INDEX)
+
+
 ACTIVE_STATE = increment_index()
 
 FAINTED_STATE = increment_index()
@@ -559,7 +573,7 @@ class GameState():
 				entry_hazards.append((entry_hazard, self.get_entry_hazard(player, entry_hazard)))
 
 		return entry_hazards
-
+		
 	def update_abilities(self, player, pokemon, ability):
 		#TODO: replace implementation with packing into vector list
 		pokemon_name = GameState.pokemon_name_clean(str(pokemon))
