@@ -159,6 +159,10 @@ class BotClient(showdown.Client):
 		self.challenge = challenge
 		self.has_challenged = False
 
+		# flag used to detect the first 'request' inp_type
+		# first request is used to initialize moves for gamestate
+		self.is_first_request = True
+
 		self.wins = 0
 		self.losses = 0
 		self.print_stats = print_stats
@@ -322,6 +326,7 @@ class BotClient(showdown.Client):
 
 		room_obj = self.rooms.get(room_id)
 		if room_obj and room_obj.id.startswith('battle-'):
+			
 			if inp_type == 'poke':
 				owner = params[0]
 				pokename = GameState.pokemon_name_clean(params[1])
@@ -428,28 +433,60 @@ class BotClient(showdown.Client):
 					self.agent.update_replay_memory(transition)
 					self.agent.train(False)
 				self.log(f'This transition\'s reward was {reward}')
+				
 			elif inp_type == 'request':
 				json_string = params[0]
 				data = json.loads(json_string)
-				self.last_request_data = data
 				team_info = self.get_team_info(data)
-				self.team_abilities = {}
-				self.team_items = {}
+				self.last_request_data = data
+
 				for pokemon_info in team_info:
 					self.log('info', pokemon_info)
 					pokemon_name = GameState.pokemon_name_clean(pokemon_info['details'])
-					# get the ability for each pokemon
-					self.team_abilities[pokemon_name] = pokemon_info['ability']
-					# track the items each pokemon
-					self.team_items[pokemon_name] = pokemon_info['item']
-					for move_name in pokemon_info['moves']:
-						self.gs.set_move(GameState.Player.one, pokemon_name, 
-							move_name)						
-				self.log('team abilities', self.team_abilities)
-				self.log('team items', self.team_items)
+					
+					# Initialize all available pokemon moves for game stats
+					if self.is_first_request:
+						for move_name in pokemon_info['moves']:
+							# Initially PP = Max PP, so pseudo PP, Max PP values to set move
+							# as PP, Max PP are available for only active Pokemons and all Pokemons
+							self.gs.set_move(GameState.Player.one, pokemon_name, move_name, 1.0, 1.0)	
+							self.is_first_request = False
+					
+					# Update PP for the active pokemon only
+					else:
+						if pokemon_info['active'] == True:
+							if 'active' in data:
+								moves = data['active']['moves']
+								for move in moves:
+									self.gs.set_move(GameState.Player.one, pokemon_name, move['id'],
+										move['pp'], move['maxpp'])
+
+					# Update pokemon stat for game state
+					stats = pokemon_info['stats']
+					for stat_name in stats:
+						self.gs.set_stat(GameState.Player.one, pokemon_name, stat_name, stats[stat_name])
+
+					# Update pokemon item for game state
+					item = pokemon_info['item']
+					# If item key has empty string if no item possesed by Pokemon,
+					# item could have been knocked out or used my Pokemon
+					if item == '':
+						self.gs.clear_all_items(GameState.Player.one, pokemon_name)
+					
+					# Else update item with the current item even if there is no change
+					# clear old item and set new item as a Pokemon can possess only an item at a time
+					else:
+						self.gs.clear_all_items(GameState.Player.one, pokemon_name)
+						self.gs.set_item(GameState.Player.one, pokemon_name, item)	
+
+				self.log(f'GameState Vector: MOVES => {self.gs.all_moves}')
+				self.log(f'GameState Vector: ITEMS => {self.gs.all_items}')
+				self.log(f'GameState Vector: STATS => {self.gs.all_stats}')
+
 				force_switch = data.get('forceSwitch', [False])[0]
 				if force_switch == True:
 					await self.switch_pokemon(room_obj, data)
+
 				else:
 					await self.take_action(room_obj, data)
 			
@@ -613,6 +650,7 @@ class BotClient(showdown.Client):
 				self.iterations_run += 1
 				self.update_log_paths()
 				if self.should_play_new_game():
+					self.is_first_request = True
 					self.log("Starting iteration {}".format(self.iterations_run))
 					if self.challenge:
 						time.sleep(5)
