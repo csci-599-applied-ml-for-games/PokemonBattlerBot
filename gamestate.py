@@ -614,6 +614,39 @@ class GameState():
 
 		return stats
 	
+	def _set_item(self, player, team_position, item_position, value):
+		self.set_pokemon_attribute(player, team_position, item_position, value)
+	
+	def set_item(self, player, pokemon_name, item_name):
+		team_position = self.name_to_position[player][pokemon_name]
+		item_position = ITEM_NAME_TO_INDEX.get(item_name, ITEM_NAME_TO_INDEX['NotFound'])
+		self._set_item(player, team_position, item_position, 1.0)
+
+	def get_item(self, player, pokemon_name, item_name):
+		team_position = self.name_to_position[player][pokemon_name]
+		item_position = ITEM_NAME_TO_INDEX.get(item_name, ITEM_NAME_TO_INDEX['NotFound'])
+		return self.get_pokemon_attribute(player, team_position, item_position)
+
+	def clear_all_items(self, player, pokemon_name):
+		team_position = self.name_to_position[player][pokemon_name]
+		for item_name in ITEM_NAME_TO_INDEX:
+			if item_name not in ['Min', 'Count']:
+				item_position = ITEM_NAME_TO_INDEX.get(item_name)
+				self._set_item(player, team_position, item_position, 0.0)
+
+	def all_items(self, player):
+		items = []
+		team = self.name_to_position[player]
+		for pokemon_name in team:
+			pokemon_items = []
+			for item_name in ITEM_NAME_TO_INDEX:
+				if self.get_item(player, pokemon_name, item_name) == 1.0 and item_name not in ['Min', 'Count']:
+					pokemon_items.append(item_name)
+
+			items.append((pokemon_name, pokemon_items))
+
+		return items
+
 	def update_abilities(self, player, pokemon, ability):
 		#TODO: replace implementation with packing into vector list
 		pokemon_name = GameState.pokemon_name_clean(str(pokemon))
