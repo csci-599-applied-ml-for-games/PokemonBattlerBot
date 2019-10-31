@@ -774,23 +774,28 @@ class BotClient(showdown.Client):
 				even if the move or ability would result in a Pokémon without an item.
 
 				Note:
-					Kept of legacy and inclusiveness reasons
+					Kept for legacy and inclusiveness reasons
 					Actual tracking of this hook done based on changed
 					Item in 'request' inp_type
 				'''
 				pass
 
+
 			elif inp_type == 'move':
-				if ('p1a' in str(params[0])):
-					# player 1 active pokemon used move.
-					pokemon = params[0].strip('p1a: ')
-					# self.enemy_state.update_moves_list(pokemon, params[1])
-					self.log('P1 used: ', params[1])
-					self.log('Enemy Moves State:', self.enemy_state.team_moves)
-				else:
-					# player 2 pokemon used move.
-					my_move = params[1]
-					self.log('P2 used: ', my_move)
+				'''
+				move|POKEMON|MOVE|TARGET
+				The specified Pokémon has used move MOVE at TARGET. 
+				If a move has multiple targets or no target, TARGET should be ignored. 
+				If a move targets a side, TARGET will be a (possibly fainted) Pokémon on that side.
+				If |[miss] is present, the move missed.
+				
+				Note:
+					Kept for legacy and inclusiveness reasons
+					Actual tracking of this hook done based on changed
+					moves in 'request' inp_type
+				'''
+					self.log(params)
+					
 
 			elif inp_type == '-zpower':
 				if ('p1a' in str(params[0])):
