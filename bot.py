@@ -747,10 +747,38 @@ class BotClient(showdown.Client):
 					# AI uses mega
 					self.mega = True
 
+
 			elif inp_type == '-item':
-				# how do we use items I don't get it...
-				self.log('item')
-				#self.log(params)
+				'''
+				-item|POKEMON|ITEM
+				The ITEM held by the POKEMON has been changed or revealed due to a move or ability. 
+				In addition, Air Balloon reveals itself when the Pokémon holding it switches in, so it will also cause this message to appear.
+				'''
+				position = self.get_owner(params)
+				pokemon_name = self.get_pokemon(params)
+				item = util.item_name_to_id(params[1])
+				if position.startswith(self.position):
+					self.gs.set_item(GameState.Player.one, pokemon_name, item)
+				
+				else:
+					self.gs.set_item(GameState.Player.two, pokemon_name, item)
+
+
+			elif inp_type == '-enditem':
+				'''
+				-enditem|POKEMON|ITEM
+				The ITEM held by POKEMON has been destroyed, and it now holds no item. 
+				This can be because of an item's own effects (consumed Berries, Air Balloon), or by a move or ability, like Knock Off. 
+				If a berry is consumed, it also has an additional modifier |[eat] to indicate that it was consumed. 
+				This message does not appear if the item's ownership was changed (with a move or ability like Thief or Trick), 
+				even if the move or ability would result in a Pokémon without an item.
+
+				Note:
+					Kept of legacy and inclusiveness reasons
+					Actual tracking of this hook done based on changed
+					Item in 'request' inp_type
+				'''
+				pass
 
 			elif inp_type == 'move':
 				if ('p1a' in str(params[0])):
