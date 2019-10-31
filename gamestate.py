@@ -573,6 +573,36 @@ class GameState():
 				entry_hazards.append((entry_hazard, self.get_entry_hazard(player, entry_hazard)))
 
 		return entry_hazards
+
+	def _set_stat(self, player, team_position, stat_position, value):
+		self.set_pokemon_attribute(player, team_position, stat_position, value)
+	
+	def set_stat(self, player, pokemon_name, stat_name, value):
+		team_position = self.name_to_position[player][pokemon_name]
+		stat_position = STAT_NAME_TO_INDEX.get(stat_name, STAT_NAME_TO_INDEX['NotFound'])
+		value = value / STAT_NORMALIZER
+		if value > 1.0:
+			value = 1.0
+		
+		self._set_stat(player, team_position, stat_position, value)
+	
+	def get_stat(self, player, pokemon_name, stat_name):
+		team_position = self.name_to_position[player][pokemon_name]
+		stat_position = STAT_NAME_TO_INDEX.get(stat_name, STAT_NAME_TO_INDEX['NotFound'])
+		return self.get_pokemon_attribute(player, team_position, stat_position)
+
+	def all_stats(self, player):
+		stats = []
+		team = self.name_to_position[player]
+		for pokemon_name in team:
+			pokemon_stats = []
+			for stat_name in STAT_NAME_TO_INDEX:
+				if stat_name not in ['Min', 'Count']:
+					pokemon_stats.append((stat_name, self.get_stat(player, pokemon_name, stat_name)))
+			
+			stats.append((pokemon_name, pokemon_stats))
+
+		return stats
 	
 	def update_abilities(self, player, pokemon, ability):
 		#TODO: replace implementation with packing into vector list
