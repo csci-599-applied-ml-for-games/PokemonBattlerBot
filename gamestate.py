@@ -423,13 +423,13 @@ class GameState():
 				fainted.append(name)
 		return fainted
 
-	def _set_move(self, player, position, move_position, value):
-		self.set_pokemon_attribute(player, position, move_position, value)
+	def _set_move(self, player, team_position, move_position, value):
+		self.set_pokemon_attribute(player, team_position, move_position, value)
 
-	def set_move(self, player, name, move_name):
-		team_position = self.name_to_position[player][name]
+	def set_move(self, player, pokemon_name, move_name, pp, max_pp):
+		team_position = self.name_to_position[player][pokemon_name]
 		move_position = MOVE_NAME_TO_INDEX.get(move_name, MOVE_NAME_TO_INDEX['NotFound'])
-		self._set_move(player, team_position, move_position, 1.0)
+		self._set_move(player, team_position, move_position, pp/max_pp)
 
 	def check_moves(self, player, name):
 		name = GameState.pokemon_name_clean(name)
