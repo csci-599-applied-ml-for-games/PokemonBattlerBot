@@ -441,7 +441,7 @@ class BotClient(showdown.Client):
 				self.last_request_data = data
 
 				for pokemon_info in team_info:
-					self.log('info', pokemon_info)
+					self.log('BotClient: Pokemon_Info => {pokemon_info}')
 					pokemon_name = GameState.pokemon_name_clean(pokemon_info['details'])
 					
 					# Initialize all available pokemon moves for game stats
