@@ -742,32 +742,32 @@ if __name__ == '__main__':
 					print(f'{GameState.Player.two}: ' 
 						f'Pokemon {name} was unexpectedly alive')
 
-	# def check_moves(player, pokemon, move_names):
-	# 	has_moves = gs.check_moves(player, pokemon)
-	# 	if set(has_moves) != set(move_names):
-	# 		print(f'{pokemon} has moves {has_moves} instead of {move_names}')
+	def check_moves(player, pokemon, move_names):
+		has_moves = gs.check_moves(player, pokemon)
+		if set(has_moves) != set(move_names):
+			print(f'{pokemon} has moves {has_moves} instead of {move_names}')
 
-	# def test_moves(player, pokemon, move_names):
-	# 	for move_name in move_names:
-	# 		gs.set_move(player, pokemon, move_name)
-	# 	check_moves(player, pokemon, move_names)
+	def test_moves(player, pokemon, move_names):
+		for move_name in move_names:
+			gs.set_move(player, pokemon, move_name, 1.0, 1.0)
+		check_moves(player, pokemon, move_names)
 	
-	# for player in GameState.Player:
-	# 	if player == GameState.Player.count:
-	# 		continue
+	for player in GameState.Player:
+		if player == GameState.Player.count:
+			continue
 			
-	# 	pokemon_moves = [
-	# 		('Pelipper', ['Knock Off', 'U-turn', 'Scald', 'Roost']),
-	# 		('Greninja', ['Hydro Pump', 'Dark Pulse', 'Water Shuriken', 'Spikes']),
-	# 		('Swampert', ['Waterfall', 'Earthquake', 'Ice Punch', 'Superpower']),
-	# 		('Manaphy', ['Tail Glow', 'Surf', 'Ice Beam', 'Rest']),
-	# 		('Ferrothorn', ['Stealth Rock', 'Knock Off', 'Toxic', 'Power Whip']),
-	# 		('Tornadus', ['Hurricane', 'Knock Off', 'U-turn', 'Defog'])
-	# 	]
-	# 	for pokemon, move_names in pokemon_moves:
-	# 		test_moves(player, pokemon, move_names)
-	# 	for pokemon, move_names in pokemon_moves:
-	# 		check_moves(player, pokemon, move_names)
+		pokemon_moves = [
+			('Pelipper', ['knockoff', 'uturn', 'scald', 'roost']),
+			('Greninja', ['hydropump', 'darkpulse', 'watershuriken', 'spikes']),
+			('Swampert', ['waterfall', 'earthquake', 'icepunch', 'superpower']),
+			('Manaphy', ['tailglow', 'surf', 'icebeam', 'rest']),
+			('Ferrothorn', ['stealthrock', 'knockoff', 'toxic', 'powerwhip']),
+			('Tornadus', ['hurricane', 'knockoff', 'uturn', 'defog'])
+		]
+		for pokemon, move_names in pokemon_moves:
+			test_moves(player, pokemon, move_names)
+		for pokemon, move_names in pokemon_moves:
+			check_moves(player, pokemon, move_names)
 
 	def check_types(player, pokemon, type_names):
 		has_types = gs.check_types(player, pokemon)
