@@ -1054,3 +1054,45 @@ if __name__ == '__main__':
 				print(f'Unexpected entry_hazard_increment for player {player}, got > 1.0 value')
 				print(f'Expected: {expected_entry_hazard_value} value for {entry_hazard}')
 				print(f'Got: {actual_entry_hazard_value} value for {entry_hazard}')
+
+
+	# Test case for item names
+	test_items = ['damprock', 'choicespecs', 'swampertite', 'wateriumz',
+		'figyberry', 'rockyhelmet']
+	for item in ITEM_NAME_TO_INDEX.keys():
+		if item not in test_items and item not in ['Min', 'Count', 'NotFound']:
+			print(f'Unexpected item: {item}')
+
+	# Test case for item set and clear_all
+	for player in GameState.Player:
+		if player == GameState.Player.count:
+			continue 
+
+		# set all items to 1.0
+		for pokemon_name in POKEMON_NAME_TO_INDEX.keys():
+			for item in test_items:
+				gs.set_item(player, pokemon_name, item)
+		
+		# Check set value with expected value (= 1.0)
+		for pokemon_name in POKEMON_NAME_TO_INDEX.keys():
+			for item in test_items:
+				expected_item_value = 1.0
+				actual_item_value = gs.get_item(player, pokemon_name, item)
+				if expected_item_value != actual_item_value:
+					print(f'Unexpected set_item for player {player}')
+					print(f'Expected: {expected_item_value} value for {item} for {pokemon_name}')
+					print(f'Got: {actual_item_value} value for {item} for {pokemon_name}')
+		
+		# clear all items
+		for pokemon_name in POKEMON_NAME_TO_INDEX.keys():
+			gs.clear_all_items(player, pokemon_name)
+
+		# Check clear value with expected value (= 0.0)
+		for pokemon_name in POKEMON_NAME_TO_INDEX.keys():
+			for item in test_items:
+				expected_item_value = 0.0
+				actual_item_value = gs.get_item(player, pokemon_name, item)
+				if expected_item_value != actual_item_value:
+					print(f'Unexpected set_item for player {player}')
+					print(f'Expected: {expected_item_value} value for {item} for {pokemon_name}')
+					print(f'Got: {actual_item_value} value for {item} for {pokemon_name}')

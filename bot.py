@@ -453,7 +453,7 @@ class BotClient(showdown.Client):
 						pokemon_name = GameState.pokemon_name_clean(pokemon_info['details'])						
 						for move_name in pokemon_info['moves']:
 							# Initially PP = Max PP, so pseudo PP, Max PP values to set move
-							# as PP, Max PP are available for only active Pokemons and all Pokemons
+							# as PP, Max PP are available for only active Pokemons
 							self.gs.set_move(GameState.Player.one, pokemon_name, move_name, 1.0, 1.0)	
 												
 					self.is_first_request = False
