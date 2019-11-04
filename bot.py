@@ -65,6 +65,8 @@ class RunType(Enum):
 def hack_name(pokemon):
 	if pokemon == 'Tornadus': 
 		return 'Tornadus-Therian'
+	elif pokemon == 'Greninja-Ash':
+		return 'Greninja'
 	else:
 		return pokemon
 
@@ -239,9 +241,8 @@ class BotClient(showdown.Client):
 			self.log(f'Unexpected action type {action_type}')
 
 	async def take_action(self, room_obj, data):
-		self.log(f'data: {data}')
+		self.log('take_action called')
 		moves = data.get('active')[0].get('moves')
-		self.log(f'Moves: {moves}')
 		valid_actions = []
 		for move_index, move_data in enumerate(moves):
 			if ((move_data.get('pp', 0) > 0 and not move_data.get('disabled'))
@@ -268,9 +269,12 @@ class BotClient(showdown.Client):
 		action_index, action_string, action_type, self.action = \
 			self.agent.get_action(self.gs.vector_list, valid_actions)
 
+		self.log(f'after get_action {action_index}, {action_string}, {action_type}, {self.action}')
 		if action_type == ActionType.Move:
+			self.log(f'move called {action_index}')
 			await room_obj.move(action_index) 
 		elif action_type == ActionType.Switch:
+			self.log('switch called')
 			await room_obj.switch(action_index)
 		else:
 			self.log(f'Unexpected action type {action_type}')
@@ -424,34 +428,33 @@ class BotClient(showdown.Client):
 						reward, 
 						self.state_vl, 
 						done)
-					self.log(f'Updating replay memory with {transition}')
 					self.agent.update_replay_memory(transition)
 					self.agent.train(False)
 				self.log(f'This transition\'s reward was {reward}')
 			elif inp_type == 'request':
 				json_string = params[0]
 				data = json.loads(json_string)
-				self.last_request_data = data
-				team_info = self.get_team_info(data)
-				self.team_abilities = {}
-				self.team_items = {}
-				for pokemon_info in team_info:
-					self.log('info', pokemon_info)
-					pokemon_name = GameState.pokemon_name_clean(pokemon_info['details'])
-					# get the ability for each pokemon
-					self.team_abilities[pokemon_name] = pokemon_info['ability']
-					# track the items each pokemon
-					self.team_items[pokemon_name] = pokemon_info['item']
-					for move_name in pokemon_info['moves']:
-						self.gs.set_move(GameState.Player.one, pokemon_name, 
-							move_name)						
-				self.log('team abilities', self.team_abilities)
-				self.log('team items', self.team_items)
-				force_switch = data.get('forceSwitch', [False])[0]
-				if force_switch == True:
-					await self.switch_pokemon(room_obj, data)
-				else:
-					await self.take_action(room_obj, data)
+				wait = data.get('wait', False)
+				if not wait:
+					self.last_request_data = data
+					team_info = self.get_team_info(data)
+					self.team_abilities = {}
+					self.team_items = {}
+					for pokemon_info in team_info:
+						pokemon_name = GameState.pokemon_name_clean(pokemon_info['details'])
+						# get the ability for each pokemon
+						self.team_abilities[pokemon_name] = pokemon_info['ability']
+						# track the items each pokemon
+						self.team_items[pokemon_name] = pokemon_info['item']
+						for move_name in pokemon_info['moves']:
+							self.gs.set_move(GameState.Player.one, pokemon_name, 
+								move_name)						
+
+					force_switch = data.get('forceSwitch', [False])[0]
+					if force_switch == True:
+						await self.switch_pokemon(room_obj, data)
+					else:
+						await self.take_action(room_obj, data)
 			
 			elif inp_type == '-status':
 				pokemon_data = params[0]
@@ -523,9 +526,7 @@ class BotClient(showdown.Client):
 				new_active_name = GameState.pokemon_name_clean(name_with_details)
 				if not my_pokemon:
 					self.opp_active_pokemon = new_active_name
-					self.log('Opp active', self.opp_active_pokemon)
 					self.gs.set_active(GameState.Player.two, self.opp_active_pokemon)
-					self.log('set_active called for p2')
 					if not self.gs.check_active(GameState.Player.two, 
 						self.opp_active_pokemon):
 						
@@ -533,9 +534,7 @@ class BotClient(showdown.Client):
 							' was not active as expected')
 				else:
 					self.active_pokemon = new_active_name
-					self.log('active_pokemon', self.active_pokemon)
 					self.gs.set_active(GameState.Player.one, self.active_pokemon)
-					self.log('set_active called for p1')
 					if not self.gs.check_active(GameState.Player.one, 
 						self.active_pokemon):
 						
