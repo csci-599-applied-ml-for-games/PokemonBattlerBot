@@ -161,7 +161,13 @@ class BotClient(showdown.Client):
 
 		# flag used to detect the first 'request' inp_type
 		# first request is used to initialize moves for gamestate
+		# Rreset to false for every battle
 		self.is_first_request = True
+
+		# Keep a track of zmoves used, as each pokemon can use z moves only once
+		# per battle, we update each zmove here used per battle so it can't be used
+		# again. Reset to empty list after battle ends
+		self.zmoves_tracker = []
 
 		self.wins = 0
 		self.losses = 0
@@ -461,6 +467,10 @@ class BotClient(showdown.Client):
 								for move in moves:
 									self.gs.set_move(GameState.Player.one, pokemon_name, move['id'],
 										move['pp'], move['maxpp'])
+								
+								if 'canZMove' in data['active'][0]:
+									zmove_id = util.pokemon_name_to_id(data['active'][0]['canZMove'][1]['move'])
+									
 
 				# Update pokemon stat and items for game state
 				for pokemon_info in team_info:
