@@ -321,8 +321,8 @@ class BotClient(showdown.Client):
 				self.log(f'{vector_pokemon} has types {has_types}')
 
 	async def on_receive(self, room_id, inp_type, params):
-		# self.log(f'Input type: {inp_type}')
-		# self.log(f'Params: {params}')
+		self.log(f'Input type: {inp_type}')
+		self.log(f'Params: {params}')
 
 		room_obj = self.rooms.get(room_id)
 		if room_obj and room_obj.id.startswith('battle-'):
@@ -440,33 +440,38 @@ class BotClient(showdown.Client):
 				team_info = self.get_team_info(data)
 				self.last_request_data = data
 
-				for pokemon_info in team_info:
-					self.log('BotClient: Pokemon_Info => ', pokemon_info)
-					pokemon_name = GameState.pokemon_name_clean(pokemon_info['details'])
-					
-					# Initialize all available pokemon moves for game stats
-					if self.is_first_request:
+				# Initialize all available pokemon moves for game stats
+				if self.is_first_request:
+					for pokemon_info in team_info:
+						self.log('BotClient: Pokemon_Info => ', pokemon_info)
+						pokemon_name = GameState.pokemon_name_clean(pokemon_info['details'])						
 						for move_name in pokemon_info['moves']:
 							# Initially PP = Max PP, so pseudo PP, Max PP values to set move
 							# as PP, Max PP are available for only active Pokemons and all Pokemons
 							self.gs.set_move(GameState.Player.one, pokemon_name, move_name, 1.0, 1.0)	
-							self.is_first_request = False
+												
+					self.is_first_request = False
 					
-					# Update PP for the active pokemon only
-					else:
+				# Update PP for the active pokemon only
+				else:
+					for pokemon_info in team_info:
+						self.log('BotClient: Pokemon_Info => ', pokemon_info)
+						pokemon_name = GameState.pokemon_name_clean(pokemon_info['details'])		
 						if pokemon_info['active'] == True:
 							if 'active' in data:
-								moves = data['active']['moves']
+								moves = data['active'][0]['moves']
 								for move in moves:
 									self.gs.set_move(GameState.Player.one, pokemon_name, move['id'],
 										move['pp'], move['maxpp'])
 
-					# Update pokemon stat for game state
+				# Update pokemon stat and items for game state
+				for pokemon_info in team_info:
+					self.log('BotClient: Pokemon_Info => ', pokemon_info)
+					pokemon_name = GameState.pokemon_name_clean(pokemon_info['details'])		
 					stats = pokemon_info['stats']
 					for stat_name in stats:
 						self.gs.set_stat(GameState.Player.one, pokemon_name, stat_name, stats[stat_name])
 
-					# Update pokemon item for game state
 					item = pokemon_info['item']
 					# If item key has empty string if no item possesed by Pokemon,
 					# item could have been knocked out or used my Pokemon
@@ -478,10 +483,6 @@ class BotClient(showdown.Client):
 					else:
 						self.gs.clear_all_items(GameState.Player.one, pokemon_name)
 						self.gs.set_item(GameState.Player.one, pokemon_name, item)	
-
-				self.log(f'GameState Vector: MOVES => ', self.gs.all_moves())
-				self.log(f'GameState Vector: ITEMS => ', self.gs.all_items())
-				self.log(f'GameState Vector: STATS => ', self.gs.all_stats())
 
 				force_switch = data.get('forceSwitch', [False])[0]
 				if force_switch == True:
