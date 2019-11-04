@@ -65,8 +65,6 @@ class RunType(Enum):
 def hack_name(pokemon):
 	if pokemon == 'Tornadus': 
 		return 'Tornadus-Therian'
-	elif pokemon == 'Greninja-Ash':
-		return 'Greninja'
 	else:
 		return pokemon
 
@@ -241,7 +239,6 @@ class BotClient(showdown.Client):
 			self.log(f'Unexpected action type {action_type}')
 
 	async def take_action(self, room_obj, data):
-		self.log('take_action called')
 		moves = data.get('active')[0].get('moves')
 		valid_actions = []
 		for move_index, move_data in enumerate(moves):
@@ -269,12 +266,9 @@ class BotClient(showdown.Client):
 		action_index, action_string, action_type, self.action = \
 			self.agent.get_action(self.gs.vector_list, valid_actions)
 
-		self.log(f'after get_action {action_index}, {action_string}, {action_type}, {self.action}')
 		if action_type == ActionType.Move:
-			self.log(f'move called {action_index}')
 			await room_obj.move(action_index) 
 		elif action_type == ActionType.Switch:
-			self.log('switch called')
 			await room_obj.switch(action_index)
 		else:
 			self.log(f'Unexpected action type {action_type}')
@@ -307,7 +301,6 @@ class BotClient(showdown.Client):
 		self.gs.set_team(player, team)
 		for position, member in enumerate(team):
 			vector_pokemon = self.gs.check_team_position(player, position)
-			self.log(f'Vector team member: {vector_pokemon}')
 
 			if member != vector_pokemon:
 				self.log('WARNING: mismatched pokemon')
@@ -336,9 +329,6 @@ class BotClient(showdown.Client):
 
 				if (len(self.team) == self.teamsize and
 					len(self.opp_team) == self.opp_teamsize):
-
-					self.log(f'Team: {self.team}')
-					self.log(f'Opp team: {self.opp_team}')
 					
 					self.gs = GameState()
 					self.set_and_check_team(GameState.Player.one, self.team)
