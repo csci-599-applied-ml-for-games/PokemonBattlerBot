@@ -742,32 +742,32 @@ if __name__ == '__main__':
 					print(f'{GameState.Player.two}: ' 
 						f'Pokemon {name} was unexpectedly alive')
 
-	def check_moves(player, pokemon, move_names):
-		has_moves = gs.check_moves(player, pokemon)
-		if set(has_moves) != set(move_names):
-			print(f'{pokemon} has moves {has_moves} instead of {move_names}')
+	# def check_moves(player, pokemon, move_names):
+	# 	has_moves = gs.check_moves(player, pokemon)
+	# 	if set(has_moves) != set(move_names):
+	# 		print(f'{pokemon} has moves {has_moves} instead of {move_names}')
 
-	def test_moves(player, pokemon, move_names):
-		for move_name in move_names:
-			gs.set_move(player, pokemon, move_name)
-		check_moves(player, pokemon, move_names)
+	# def test_moves(player, pokemon, move_names):
+	# 	for move_name in move_names:
+	# 		gs.set_move(player, pokemon, move_name)
+	# 	check_moves(player, pokemon, move_names)
 	
-	for player in GameState.Player:
-		if player == GameState.Player.count:
-			continue
+	# for player in GameState.Player:
+	# 	if player == GameState.Player.count:
+	# 		continue
 			
-		pokemon_moves = [
-			('Pelipper', ['Knock Off', 'U-turn', 'Scald', 'Roost']),
-			('Greninja', ['Hydro Pump', 'Dark Pulse', 'Water Shuriken', 'Spikes']),
-			('Swampert', ['Waterfall', 'Earthquake', 'Ice Punch', 'Superpower']),
-			('Manaphy', ['Tail Glow', 'Surf', 'Ice Beam', 'Rest']),
-			('Ferrothorn', ['Stealth Rock', 'Knock Off', 'Toxic', 'Power Whip']),
-			('Tornadus', ['Hurricane', 'Knock Off', 'U-turn', 'Defog'])
-		]
-		for pokemon, move_names in pokemon_moves:
-			test_moves(player, pokemon, move_names)
-		for pokemon, move_names in pokemon_moves:
-			check_moves(player, pokemon, move_names)
+	# 	pokemon_moves = [
+	# 		('Pelipper', ['Knock Off', 'U-turn', 'Scald', 'Roost']),
+	# 		('Greninja', ['Hydro Pump', 'Dark Pulse', 'Water Shuriken', 'Spikes']),
+	# 		('Swampert', ['Waterfall', 'Earthquake', 'Ice Punch', 'Superpower']),
+	# 		('Manaphy', ['Tail Glow', 'Surf', 'Ice Beam', 'Rest']),
+	# 		('Ferrothorn', ['Stealth Rock', 'Knock Off', 'Toxic', 'Power Whip']),
+	# 		('Tornadus', ['Hurricane', 'Knock Off', 'U-turn', 'Defog'])
+	# 	]
+	# 	for pokemon, move_names in pokemon_moves:
+	# 		test_moves(player, pokemon, move_names)
+	# 	for pokemon, move_names in pokemon_moves:
+	# 		check_moves(player, pokemon, move_names)
 
 	def check_types(player, pokemon, type_names):
 		has_types = gs.check_types(player, pokemon)
@@ -1069,12 +1069,12 @@ if __name__ == '__main__':
 			continue 
 
 		# set all items to 1.0
-		for pokemon_name in POKEMON_NAME_TO_INDEX.keys():
+		for pokemon_name in team1:
 			for item in test_items:
 				gs.set_item(player, pokemon_name, item)
 		
 		# Check set value with expected value (= 1.0)
-		for pokemon_name in POKEMON_NAME_TO_INDEX.keys():
+		for pokemon_name in team1:
 			for item in test_items:
 				expected_item_value = 1.0
 				actual_item_value = gs.get_item(player, pokemon_name, item)
@@ -1084,11 +1084,11 @@ if __name__ == '__main__':
 					print(f'Got: {actual_item_value} value for {item} for {pokemon_name}')
 		
 		# clear all items
-		for pokemon_name in POKEMON_NAME_TO_INDEX.keys():
+		for pokemon_name in team1:
 			gs.clear_all_items(player, pokemon_name)
 
 		# Check clear value with expected value (= 0.0)
-		for pokemon_name in POKEMON_NAME_TO_INDEX.keys():
+		for pokemon_name in team1:
 			for item in test_items:
 				expected_item_value = 0.0
 				actual_item_value = gs.get_item(player, pokemon_name, item)
