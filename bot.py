@@ -167,6 +167,7 @@ class BotClient(showdown.Client):
 		# Keep a track of zmoves used, as each pokemon can use z moves only once
 		# per battle, we update each zmove here used per battle so it can't be used
 		# again. Reset to empty list after battle ends
+		# type: [{pokemon_name : zmove}]
 		self.zmoves_tracker = []
 
 		self.wins = 0
@@ -469,8 +470,9 @@ class BotClient(showdown.Client):
 										move['pp'], move['maxpp'])
 								
 								if 'canZMove' in data['active'][0]:
-									zmove_id = util.pokemon_name_to_id(data['active'][0]['canZMove'][1]['move'])
-									
+									if pokemon_name not in self.zmoves_tracker:
+										zmove_id = util.move_name_to_id(data['active'][0]['canZMove'][1]['move'])
+										self.gs.set_move(GameState.Player.one, pokemon_name, zmove_id, 1.0, 1.0)
 
 				# Update pokemon stat and items for game state
 				for pokemon_info in team_info:
@@ -659,6 +661,7 @@ class BotClient(showdown.Client):
 				self.update_log_paths()
 				if self.should_play_new_game():
 					self.is_first_request = True
+					self.zmoves_tracker = []
 					self.log("Starting iteration {}".format(self.iterations_run))
 					if self.challenge:
 						time.sleep(5)
@@ -796,25 +799,28 @@ class BotClient(showdown.Client):
 				If a move has multiple targets or no target, TARGET should be ignored. 
 				If a move targets a side, TARGET will be a (possibly fainted) Pokémon on that side.
 				If |[miss] is present, the move missed.
-				
-				Note:
-					Kept for legacy and inclusiveness reasons
-					Actual tracking of this hook done based on changed
-					moves in 'request' inp_type
 				'''
-				self.log('BotClient: Move => ', params)
-					
+				if len(params) == 4:
+					if params[3] == '[zeffect]':
+						if self.get_owner(params[0]) == 'p1a':
+							pokemon_name = self.get_pokemon(params[0])
+							zmove_id = util.move_name_to_id(params[1])
+							# Add (pokemon : zmove) in the zmove_tracker to
+							# ensure, this pokemon can't re-use zmove
+							self.zmoves_tracker[pokemon_name] = zmove_name
+							self.gs.set_move(GameState.Player.one, pokemon_name, zmove_id, 0.0, 1.0)
 
 			elif inp_type == '-zpower':
-				if ('p1a' in str(params[0])):
-					# opposing player used Z Power
-					pokemon = params[0].strip('p1a: ')
-					# self.enemy_state.update_used_zpower(pokemon)
-					self.opp_zpower = True
-				else:
-					# Add which pokemon used the zpower obviously but should discuss data structure 
-					# and design of objects first.
-					self.z_power = True
+				'''
+				|-zpower|POKEMON
+				The Pokémon POKEMON has used the z-move version of its move.
+
+				Note:
+					Kept for legacy and inclusiveness reasons
+					Actual tracking of zpower done in the '-move'
+					hook
+				'''
+				pass
 
 			elif inp_type == '-weather':
 				weather_name = params[0]
