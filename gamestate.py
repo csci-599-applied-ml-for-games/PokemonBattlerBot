@@ -105,6 +105,9 @@ MOVE_NAME_TO_INDEX = {
 	'powerwhip': increment_index(),
 	'hurricane': increment_index(),
 	'defog': increment_index(),
+
+	# Z-moves only below this comment
+	'hydrovortex': increment_index(),
 	'NotFound': increment_index(),
 }
 _, INDEX_TO_MOVE_NAME = attribute_dict_setup(MOVE_NAME_TO_INDEX)
