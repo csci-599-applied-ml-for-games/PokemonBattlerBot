@@ -443,7 +443,6 @@ class BotClient(showdown.Client):
 				# Initialize all available pokemon moves for game stats
 				if self.is_first_request:
 					for pokemon_info in team_info:
-						self.log('BotClient: Pokemon_Info => ', pokemon_info)
 						pokemon_name = GameState.pokemon_name_clean(pokemon_info['details'])						
 						for move_name in pokemon_info['moves']:
 							# Initially PP = Max PP, so pseudo PP, Max PP values to set move
@@ -455,7 +454,6 @@ class BotClient(showdown.Client):
 				# Update PP for the active pokemon only
 				else:
 					for pokemon_info in team_info:
-						self.log('BotClient: Pokemon_Info => ', pokemon_info)
 						pokemon_name = GameState.pokemon_name_clean(pokemon_info['details'])		
 						if pokemon_info['active'] == True:
 							if 'active' in data:
@@ -466,7 +464,6 @@ class BotClient(showdown.Client):
 
 				# Update pokemon stat and items for game state
 				for pokemon_info in team_info:
-					self.log('BotClient: Pokemon_Info => ', pokemon_info)
 					pokemon_name = GameState.pokemon_name_clean(pokemon_info['details'])		
 					stats = pokemon_info['stats']
 					for stat_name in stats:
