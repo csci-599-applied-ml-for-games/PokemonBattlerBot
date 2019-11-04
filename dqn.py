@@ -130,9 +130,9 @@ class DQNAgent():
 				q_value = 0
 				self.log(f'Unexpected index {action_q_index}')
 
-			formatted_actions = (action_q_index, 
+			formatted_actions.append((action_q_index, 
 				q_value, 
-				(action_index, action_name, action_type))
+				(action_index, action_name, action_type)))
 
 		#NOTE: As epsilon grows small, we make fewer random choices
 		if self.training and random.random() <= self.epsilon: 
