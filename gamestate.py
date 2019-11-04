@@ -1096,3 +1096,48 @@ if __name__ == '__main__':
 					print(f'Unexpected set_item for player {player}')
 					print(f'Expected: {expected_item_value} value for {item} for {pokemon_name}')
 					print(f'Got: {actual_item_value} value for {item} for {pokemon_name}')
+
+
+	# Test case for stats
+	test_stats = ['atk', 'def', 'spa', 'spd',
+		'spe']
+	for stat in STAT_NAME_TO_INDEX.keys():
+		if stat not in test_stats and stat not in ['Min', 'Count', 'NotFound']:
+			print(f'Unexpected stat: {stat}')
+
+	# Test case for set stat and get stat
+	for player in GameState.Player:
+		if player == GameState.Player.count:
+			continue 
+
+		test_stat_value = 1000
+		# set all stat to test_stat_value
+		for pokemon_name in team1:
+			for stat in test_stats:
+				gs.set_stat(player, pokemon_name, stat, test_stat_value)
+		
+		# Check set value with expected value (= test_stat_value / STAT_NORMALIZER)
+		for pokemon_name in team1:
+			for stat in test_stats:
+				expected_stat_value = test_stat_value / STAT_NORMALIZER
+				actual_stat_value = gs.get_stat(player, pokemon_name, stat)
+				if expected_stat_value != actual_stat_value:
+					print(f'Unexpected set_stat, get_stat for player {player}')
+					print(f'Expected: {expected_stat_value} value for {stat} for {pokemon_name}')
+					print(f'Got: {actual_stat_value} value for {stat} for {pokemon_name}')
+		
+		test_stat_value = 4000
+		# set all stat to test_stat_value to check max stat value should be 1.0
+		for pokemon_name in team1:
+			for stat in test_stats:
+				gs.set_stat(player, pokemon_name, stat, test_stat_value)
+		
+		# Check set value with expected value (= 1.0)
+		for pokemon_name in team1:
+			for stat in test_stats:
+				expected_stat_value = 1.0
+				actual_stat_value = gs.get_stat(player, pokemon_name, stat)
+				if expected_stat_value != actual_stat_value:
+					print(f'Unexpected set_stat, get_stat for player {player}')
+					print(f'Expected: {expected_stat_value} value for {stat} for {pokemon_name}')
+					print(f'Got: {actual_stat_value} value for {stat} for {pokemon_name}')
