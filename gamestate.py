@@ -172,6 +172,9 @@ NORMALIZED_HEALTH = increment_index()
 
 ATTRIBUTES_PER_POKEMON = INDEX_TRACKER + 1
 
+def clean_move_name(move_name):
+	return move_name.lower().replace(' ', '')
+
 def start_of_pokemon(player, team_position):
 	return (SHARED_ATTRIBUTES_COUNT + 
 		player * GameState.num_player_elements + 

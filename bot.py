@@ -34,7 +34,7 @@ from docopt import docopt
 
 import showdown 
 
-from gamestate import GameState, health_sum, ko_count
+from gamestate import GameState, health_sum, ko_count, clean_move_name
 from dqn import DQNAgent, ActionType
 
 LOGS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
@@ -248,7 +248,7 @@ class BotClient(showdown.Client):
 				or move_data.get('move') == 'Struggle'):
 				
 				valid_actions.append((move_index + 1, 
-					move_data['move'], 
+					clean_move_name(move_data['move']), 
 					ActionType.Move))
 		move_count = len(moves)
 

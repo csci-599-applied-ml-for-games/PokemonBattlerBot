@@ -106,6 +106,7 @@ class DQNAgent():
 		.
 		switch_pokemon_m
 		'''
+		self.log(f'Called get_action for {valid_actions}')
 		rv = random.choice(valid_actions) + (None,) 
 
 		#NOTE: grab zeroth element b/c we only passed in one state
@@ -113,13 +114,20 @@ class DQNAgent():
 
 		formatted_actions = []
 		for action_index, action_name, action_type in valid_actions:
+			self.log(f'entering loop for {action_name}')
 			if action_type == ActionType.Move:
-				action_q_index = (MOVE_NAME_TO_INDEX[action_name] - 
-					MOVE_NAME_TO_INDEX['Min'])
+				try:
+					action_q_index = (MOVE_NAME_TO_INDEX[action_name] - 
+						MOVE_NAME_TO_INDEX['Min'])
+				except KeyError:
+					return rv
 			elif action_type == ActionType.Switch:
-				action_q_index = (MOVE_NAME_TO_INDEX['Count'] + 
-					(POKEMON_NAME_TO_INDEX[action_name] - 
-						POKEMON_NAME_TO_INDEX['Min']))
+				try:
+					action_q_index = (MOVE_NAME_TO_INDEX['Count'] + 
+						(POKEMON_NAME_TO_INDEX[action_name] - 
+							POKEMON_NAME_TO_INDEX['Min']))
+				except KeyError:
+					return rv
 			else:
 				self.log(f'Unexpected action_type {action_type}')
 				return rv
