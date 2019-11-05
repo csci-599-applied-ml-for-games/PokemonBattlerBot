@@ -29,6 +29,7 @@ import util
 from datetime import datetime
 from enum import Enum, auto
 import re
+import asyncio
 
 from docopt import docopt 
 
@@ -249,7 +250,9 @@ class BotClient(showdown.Client):
 		else:
 			self.log(f'Unexpected action type {action_type}')
 
-	async def take_action(self, room_obj, data):
+	async def take_action(self, room_obj, data, delay=0):
+		await asyncio.sleep(delay) 
+		#NOTE: delay is here to make sure we get all the data before taking action
 		moves = data.get('active')[0].get('moves')
 		valid_actions = []
 		for move_index, move_data in enumerate(moves):
@@ -493,7 +496,7 @@ class BotClient(showdown.Client):
 						await self.switch_pokemon(room_obj, data)
 
 					else:
-						await self.take_action(room_obj, data)
+						await self.take_action(room_obj, data, delay=0.3)
 			
 			elif inp_type == '-status':
 				pokemon_data = params[0]
