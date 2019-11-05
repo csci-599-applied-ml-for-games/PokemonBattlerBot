@@ -66,8 +66,8 @@ class DQNAgent():
 	def create_model(self):
 		model = Sequential()
 
-		#NOTE: the current unit count (64) is chosen somewhat arbitrarily
-		model.add(Dense(64, input_shape=self.input_shape)) 
+		model.add(Dense(128, input_shape=self.input_shape)) 
+		model.add(Dense(128, activation='relu')) 
 		model.add(Dense(MAX_ACTION_SPACE_SIZE, activation='linear'))
 		model.compile(loss='mse', optimizer=Adam(lr=0.001), 
 			metrics=['accuracy'])
