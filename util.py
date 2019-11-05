@@ -1,4 +1,11 @@
 
+def item_name_to_id(item):
+    return (''.join(item.split(' '))).lower()
+
+
+def move_name_to_id(move):
+    return (''.join(move.split(' '))).lower()
+
 def get_replay_header():
     
     # returns some css and javascript initialization
