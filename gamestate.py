@@ -105,6 +105,9 @@ MOVE_NAME_TO_INDEX = {
 	'powerwhip': increment_index(),
 	'hurricane': increment_index(),
 	'defog': increment_index(),
+
+	# Z-moves only below this comment
+	'hydrovortex': increment_index(),
 	'NotFound': increment_index(),
 }
 _, INDEX_TO_MOVE_NAME = attribute_dict_setup(MOVE_NAME_TO_INDEX)
@@ -163,6 +166,30 @@ STATUS_NAME_TO_INDEX = {
 	'NotFound': increment_index(),
 }
 _, INDEX_TO_STATUS_NAME = attribute_dict_setup(STATUS_NAME_TO_INDEX)
+
+# Magic number to normalize stat values for input vector
+# For eg. 1245 spa => 1245/2000 = 0.6225 value in vector
+STAT_NORMALIZER = 2000
+STAT_NAME_TO_INDEX = {
+	'atk': increment_index(),
+	'def': increment_index(),
+	'spa': increment_index(),
+	'spd': increment_index(),
+	'spe': increment_index(),
+	'NotFound': increment_index(),
+}
+_, INDEX_TO_STAT_NAME = attribute_dict_setup(STAT_NAME_TO_INDEX)
+
+ITEM_NAME_TO_INDEX = {
+	'damprock': increment_index(),
+	'choicespecs': increment_index(),
+	'swampertite': increment_index(),
+	'wateriumz': increment_index(),
+	'figyberry': increment_index(),
+	'rockyhelmet': increment_index(),
+	'NotFound': increment_index(),
+}
+_, INDEX_TO_ITEM_NAME = attribute_dict_setup(ITEM_NAME_TO_INDEX)
 
 ACTIVE_STATE = increment_index()
 
@@ -402,23 +429,23 @@ class GameState():
 				fainted.append(name)
 		return fainted
 
-	def _set_move(self, player, position, move_position, value):
-		self.set_pokemon_attribute(player, position, move_position, value)
+	def _set_move(self, player, team_position, move_position, value):
+		self.set_pokemon_attribute(player, team_position, move_position, value)
 
-	def set_move(self, player, name, move_name):
-		team_position = self.name_to_position[player][name]
+	def set_move(self, player, pokemon_name, move_name, pp, max_pp):
+		team_position = self.name_to_position[player][pokemon_name]
 		move_position = MOVE_NAME_TO_INDEX.get(move_name, MOVE_NAME_TO_INDEX['NotFound'])
-		self._set_move(player, team_position, move_position, 1.0)
+		self._set_move(player, team_position, move_position, pp/max_pp)
 
-	def check_moves(self, player, name):
-		name = GameState.pokemon_name_clean(name)
+	def check_moves(self, player, pokemon_name):
+		pokemon_name = GameState.pokemon_name_clean(pokemon_name)
 		moves = []
-		position = self.name_to_position[player][name]
-		start_checking = (start_of_pokemon(player, position) + 
+		team_position = self.name_to_position[player][pokemon_name]
+		start_checking = (start_of_pokemon(player, team_position) + 
 			MOVE_NAME_TO_INDEX['Min'])
 		end_checking = start_checking + MOVE_NAME_TO_INDEX['Count']
 
-		start_of_move_indices = start_of_pokemon(player, position)
+		start_of_move_indices = start_of_pokemon(player, team_position)
 		for move_index in range(start_checking, end_checking):
 			if self.vector_list[move_index] == 1.0:
 				moves.append(INDEX_TO_MOVE_NAME[move_index - 
@@ -472,13 +499,13 @@ class GameState():
 
 	def set_status(self, player, name, status_name):
 		team_position = self.name_to_position[player][name]
-		type_position = STATUS_NAME_TO_INDEX.get(status_name, STATUS_NAME_TO_INDEX['NotFound'])
-		self._set_status(player, team_position, type_position, 1.0)
+		status_position = STATUS_NAME_TO_INDEX.get(status_name, STATUS_NAME_TO_INDEX['NotFound'])
+		self._set_status(player, team_position, status_position, 1.0)
 	
 	def remove_status(self, player, name, status_name):
 		team_position = self.name_to_position[player][name]
-		type_position = STATUS_NAME_TO_INDEX.get(status_name, STATUS_NAME_TO_INDEX['NotFound'])
-		self._set_status(player, team_position, type_position, 0.0)
+		status_position = STATUS_NAME_TO_INDEX.get(status_name, STATUS_NAME_TO_INDEX['NotFound'])
+		self._set_status(player, team_position, status_position, 0.0)
 
 	def check_status(self, player, name):
 		name = GameState.pokemon_name_clean(name)
@@ -562,6 +589,69 @@ class GameState():
 				entry_hazards.append((entry_hazard, self.get_entry_hazard(player, entry_hazard)))
 
 		return entry_hazards
+
+	def _set_stat(self, player, team_position, stat_position, value):
+		self.set_pokemon_attribute(player, team_position, stat_position, value)
+	
+	def set_stat(self, player, pokemon_name, stat_name, value):
+		team_position = self.name_to_position[player][pokemon_name]
+		stat_position = STAT_NAME_TO_INDEX.get(stat_name, STAT_NAME_TO_INDEX['NotFound'])
+		value = value / STAT_NORMALIZER
+		if value > 1.0:
+			value = 1.0
+		
+		self._set_stat(player, team_position, stat_position, value)
+	
+	def get_stat(self, player, pokemon_name, stat_name):
+		team_position = self.name_to_position[player][pokemon_name]
+		stat_position = STAT_NAME_TO_INDEX.get(stat_name, STAT_NAME_TO_INDEX['NotFound'])
+		return self.get_pokemon_attribute(player, team_position, stat_position)
+
+	def all_stats(self, player):
+		stats = []
+		team = self.name_to_position[player]
+		for pokemon_name in team:
+			pokemon_stats = []
+			for stat_name in STAT_NAME_TO_INDEX:
+				if stat_name not in ['Min', 'Count']:
+					pokemon_stats.append((stat_name, self.get_stat(player, pokemon_name, stat_name)))
+			
+			stats.append((pokemon_name, pokemon_stats))
+
+		return stats
+	
+	def _set_item(self, player, team_position, item_position, value):
+		self.set_pokemon_attribute(player, team_position, item_position, value)
+	
+	def set_item(self, player, pokemon_name, item_name):
+		team_position = self.name_to_position[player][pokemon_name]
+		item_position = ITEM_NAME_TO_INDEX.get(item_name, ITEM_NAME_TO_INDEX['NotFound'])
+		self._set_item(player, team_position, item_position, 1.0)
+
+	def get_item(self, player, pokemon_name, item_name):
+		team_position = self.name_to_position[player][pokemon_name]
+		item_position = ITEM_NAME_TO_INDEX.get(item_name, ITEM_NAME_TO_INDEX['NotFound'])
+		return self.get_pokemon_attribute(player, team_position, item_position)
+
+	def clear_all_items(self, player, pokemon_name):
+		team_position = self.name_to_position[player][pokemon_name]
+		for item_name in ITEM_NAME_TO_INDEX:
+			if item_name not in ['Min', 'Count']:
+				item_position = ITEM_NAME_TO_INDEX.get(item_name)
+				self._set_item(player, team_position, item_position, 0.0)
+
+	def all_items(self, player):
+		items = []
+		team = self.name_to_position[player]
+		for pokemon_name in team:
+			pokemon_items = []
+			for item_name in ITEM_NAME_TO_INDEX:
+				if self.get_item(player, pokemon_name, item_name) == 1.0 and item_name not in ['Min', 'Count']:
+					pokemon_items.append(item_name)
+
+			items.append((pokemon_name, pokemon_items))
+
+		return items
 
 	def update_abilities(self, player, pokemon, ability):
 		#TODO: replace implementation with packing into vector list
@@ -662,7 +752,7 @@ if __name__ == '__main__':
 
 	def test_moves(player, pokemon, move_names):
 		for move_name in move_names:
-			gs.set_move(player, pokemon, move_name)
+			gs.set_move(player, pokemon, move_name, 1.0, 1.0)
 		check_moves(player, pokemon, move_names)
 	
 	for player in GameState.Player:
@@ -670,12 +760,12 @@ if __name__ == '__main__':
 			continue
 			
 		pokemon_moves = [
-			('Pelipper', ['Knock Off', 'U-turn', 'Scald', 'Roost']),
-			('Greninja', ['Hydro Pump', 'Dark Pulse', 'Water Shuriken', 'Spikes']),
-			('Swampert', ['Waterfall', 'Earthquake', 'Ice Punch', 'Superpower']),
-			('Manaphy', ['Tail Glow', 'Surf', 'Ice Beam', 'Rest']),
-			('Ferrothorn', ['Stealth Rock', 'Knock Off', 'Toxic', 'Power Whip']),
-			('Tornadus', ['Hurricane', 'Knock Off', 'U-turn', 'Defog'])
+			('Pelipper', ['knockoff', 'uturn', 'scald', 'roost']),
+			('Greninja', ['hydropump', 'darkpulse', 'watershuriken', 'spikes']),
+			('Swampert', ['waterfall', 'earthquake', 'icepunch', 'superpower']),
+			('Manaphy', ['tailglow', 'surf', 'icebeam', 'rest']),
+			('Ferrothorn', ['stealthrock', 'knockoff', 'toxic', 'powerwhip']),
+			('Tornadus', ['hurricane', 'knockoff', 'uturn', 'defog'])
 		]
 		for pokemon, move_names in pokemon_moves:
 			test_moves(player, pokemon, move_names)
@@ -967,3 +1057,90 @@ if __name__ == '__main__':
 				print(f'Unexpected entry_hazard_increment for player {player}, got > 1.0 value')
 				print(f'Expected: {expected_entry_hazard_value} value for {entry_hazard}')
 				print(f'Got: {actual_entry_hazard_value} value for {entry_hazard}')
+
+
+	# Test case for item names
+	test_items = ['damprock', 'choicespecs', 'swampertite', 'wateriumz',
+		'figyberry', 'rockyhelmet']
+	for item in ITEM_NAME_TO_INDEX.keys():
+		if item not in test_items and item not in ['Min', 'Count', 'NotFound']:
+			print(f'Unexpected item: {item}')
+
+	# Test case for item set and clear_all
+	for player in GameState.Player:
+		if player == GameState.Player.count:
+			continue 
+
+		# set all items to 1.0
+		for pokemon_name in team1:
+			for item in test_items:
+				gs.set_item(player, pokemon_name, item)
+		
+		# Check set value with expected value (= 1.0)
+		for pokemon_name in team1:
+			for item in test_items:
+				expected_item_value = 1.0
+				actual_item_value = gs.get_item(player, pokemon_name, item)
+				if expected_item_value != actual_item_value:
+					print(f'Unexpected set_item for player {player}')
+					print(f'Expected: {expected_item_value} value for {item} for {pokemon_name}')
+					print(f'Got: {actual_item_value} value for {item} for {pokemon_name}')
+		
+		# clear all items
+		for pokemon_name in team1:
+			gs.clear_all_items(player, pokemon_name)
+
+		# Check clear value with expected value (= 0.0)
+		for pokemon_name in team1:
+			for item in test_items:
+				expected_item_value = 0.0
+				actual_item_value = gs.get_item(player, pokemon_name, item)
+				if expected_item_value != actual_item_value:
+					print(f'Unexpected set_item for player {player}')
+					print(f'Expected: {expected_item_value} value for {item} for {pokemon_name}')
+					print(f'Got: {actual_item_value} value for {item} for {pokemon_name}')
+
+
+	# Test case for stats
+	test_stats = ['atk', 'def', 'spa', 'spd',
+		'spe']
+	for stat in STAT_NAME_TO_INDEX.keys():
+		if stat not in test_stats and stat not in ['Min', 'Count', 'NotFound']:
+			print(f'Unexpected stat: {stat}')
+
+	# Test case for set stat and get stat
+	for player in GameState.Player:
+		if player == GameState.Player.count:
+			continue 
+
+		test_stat_value = 1000
+		# set all stat to test_stat_value
+		for pokemon_name in team1:
+			for stat in test_stats:
+				gs.set_stat(player, pokemon_name, stat, test_stat_value)
+		
+		# Check set value with expected value (= test_stat_value / STAT_NORMALIZER)
+		for pokemon_name in team1:
+			for stat in test_stats:
+				expected_stat_value = test_stat_value / STAT_NORMALIZER
+				actual_stat_value = gs.get_stat(player, pokemon_name, stat)
+				if expected_stat_value != actual_stat_value:
+					print(f'Unexpected set_stat, get_stat for player {player}')
+					print(f'Expected: {expected_stat_value} value for {stat} for {pokemon_name}')
+					print(f'Got: {actual_stat_value} value for {stat} for {pokemon_name}')
+		
+		test_stat_value = 4000
+		# set all stat to test_stat_value to check max stat value should be 1.0
+		for pokemon_name in team1:
+			for stat in test_stats:
+				gs.set_stat(player, pokemon_name, stat, test_stat_value)
+		
+		# Check set value with expected value (= 1.0)
+		for pokemon_name in team1:
+			for stat in test_stats:
+				expected_stat_value = 1.0
+				actual_stat_value = gs.get_stat(player, pokemon_name, stat)
+				if expected_stat_value != actual_stat_value:
+					print(f'Unexpected set_stat, get_stat for player {player}')
+					print(f'Expected: {expected_stat_value} value for {stat} for {pokemon_name}')
+					print(f'Got: {actual_stat_value} value for {stat} for {pokemon_name}')

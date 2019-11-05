@@ -159,6 +159,17 @@ class BotClient(showdown.Client):
 		self.challenge = challenge
 		self.has_challenged = False
 
+		# flag used to detect the first 'request' inp_type
+		# first request is used to initialize moves for gamestate
+		# Rreset to false for every battle
+		self.is_first_request = True
+
+		# Keep a track of zmoves used, as each pokemon can use z moves only once
+		# per battle, we update each zmove here used per battle so it can't be used
+		# again. Reset to empty list after battle ends
+		# type: [{pokemon_name : zmove}]
+		self.zmoves_tracker = []
+
 		self.wins = 0
 		self.losses = 0
 		self.print_stats = print_stats
@@ -242,7 +253,7 @@ class BotClient(showdown.Client):
 		moves = data.get('active')[0].get('moves')
 		valid_actions = []
 		for move_index, move_data in enumerate(moves):
-			if ((move_data.get('pp', 0) > 0 and not move_data.get('disabled'))
+			if (( move_data.get('pp', 0) > 0 and not move_data.get('disabled'))
 				or move_data.get('move') == 'Struggle'):
 				
 				valid_actions.append((move_index + 1, 
@@ -319,6 +330,7 @@ class BotClient(showdown.Client):
 
 		room_obj = self.rooms.get(room_id)
 		if room_obj and room_obj.id.startswith('battle-'):
+			
 			if inp_type == 'poke':
 				owner = params[0]
 				pokename = GameState.pokemon_name_clean(params[1])
@@ -421,28 +433,65 @@ class BotClient(showdown.Client):
 					self.agent.update_replay_memory(transition)
 					self.agent.train(False)
 				self.log(f'This transition\'s reward was {reward}')
+				
 			elif inp_type == 'request':
 				json_string = params[0]
 				data = json.loads(json_string)
 				wait = data.get('wait', False)
 				if not wait:
-					self.last_request_data = data
 					team_info = self.get_team_info(data)
-					self.team_abilities = {}
-					self.team_items = {}
+					self.last_request_data = data
+
+					# Initialize all available pokemon moves for game stats
+					if self.is_first_request:
+						for pokemon_info in team_info:
+							pokemon_name = GameState.pokemon_name_clean(pokemon_info['details'])						
+							for move_name in pokemon_info['moves']:
+								# Initially PP = Max PP, so pseudo PP, Max PP values to set move
+								# as PP, Max PP are available for only active Pokemons
+								self.gs.set_move(GameState.Player.one, pokemon_name, move_name, 1.0, 1.0)	
+													
+						self.is_first_request = False
+						
+					# Update PP for the active pokemon only
+					else:
+						for pokemon_info in team_info:
+							pokemon_name = GameState.pokemon_name_clean(pokemon_info['details'])		
+							if pokemon_info['active'] == True:
+								if 'active' in data:
+									moves = data['active'][0]['moves']
+									for move in moves:
+										self.gs.set_move(GameState.Player.one, pokemon_name, move['id'],
+											move['pp'], move['maxpp'])
+									
+									if 'canZMove' in data['active'][0]:
+										if pokemon_name not in self.zmoves_tracker:
+											zmove_id = util.move_name_to_id(data['active'][0]['canZMove'][1]['move'])
+											self.gs.set_move(GameState.Player.one, pokemon_name, zmove_id, 1.0, 1.0)
+
+					# Update pokemon stat and items for game state
 					for pokemon_info in team_info:
-						pokemon_name = GameState.pokemon_name_clean(pokemon_info['details'])
-						# get the ability for each pokemon
-						self.team_abilities[pokemon_name] = pokemon_info['ability']
-						# track the items each pokemon
-						self.team_items[pokemon_name] = pokemon_info['item']
-						for move_name in pokemon_info['moves']:
-							self.gs.set_move(GameState.Player.one, pokemon_name, 
-								move_name)						
+						pokemon_name = GameState.pokemon_name_clean(pokemon_info['details'])		
+						stats = pokemon_info['stats']
+						for stat_name in stats:
+							self.gs.set_stat(GameState.Player.one, pokemon_name, stat_name, stats[stat_name])
+
+						item = pokemon_info['item']
+						# If item key has empty string if no item possesed by Pokemon,
+						# item could have been knocked out or used my Pokemon
+						if item == '':
+							self.gs.clear_all_items(GameState.Player.one, pokemon_name)
+						
+						# Else update item with the current item even if there is no change
+						# clear old item and set new item as a Pokemon can possess only an item at a time
+						else:
+							self.gs.clear_all_items(GameState.Player.one, pokemon_name)
+							self.gs.set_item(GameState.Player.one, pokemon_name, item)	
 
 					force_switch = data.get('forceSwitch', [False])[0]
 					if force_switch == True:
 						await self.switch_pokemon(room_obj, data)
+
 					else:
 						await self.take_action(room_obj, data)
 			
@@ -602,6 +651,8 @@ class BotClient(showdown.Client):
 				self.iterations_run += 1
 				self.update_log_paths()
 				if self.should_play_new_game():
+					self.is_first_request = True
+					self.zmoves_tracker = []
 					self.log("Starting iteration {}".format(self.iterations_run))
 					if self.challenge:
 						time.sleep(5)
@@ -698,33 +749,69 @@ class BotClient(showdown.Client):
 					# AI uses mega
 					self.mega = True
 
+
 			elif inp_type == '-item':
-				# how do we use items I don't get it...
-				self.log('item')
-				#self.log(params)
+				'''
+				-item|POKEMON|ITEM
+				The ITEM held by the POKEMON has been changed or revealed due to a move or ability. 
+				In addition, Air Balloon reveals itself when the Pokémon holding it switches in, so it will also cause this message to appear.
+				'''
+				position = self.get_owner(params)
+				pokemon_name = self.get_pokemon(params)
+				item = util.item_name_to_id(params[1])
+				if position.startswith(self.position):
+					self.gs.set_item(GameState.Player.one, pokemon_name, item)
+				
+				else:
+					self.gs.set_item(GameState.Player.two, pokemon_name, item)
+
+
+			elif inp_type == '-enditem':
+				'''
+				-enditem|POKEMON|ITEM
+				The ITEM held by POKEMON has been destroyed, and it now holds no item. 
+				This can be because of an item's own effects (consumed Berries, Air Balloon), or by a move or ability, like Knock Off. 
+				If a berry is consumed, it also has an additional modifier |[eat] to indicate that it was consumed. 
+				This message does not appear if the item's ownership was changed (with a move or ability like Thief or Trick), 
+				even if the move or ability would result in a Pokémon without an item.
+
+				Note:
+					Kept for legacy and inclusiveness reasons
+					Actual tracking of this hook done based on changed
+					Item in 'request' inp_type
+				'''
+				pass
+
 
 			elif inp_type == 'move':
-				if ('p1a' in str(params[0])):
-					# player 1 active pokemon used move.
-					pokemon = params[0].strip('p1a: ')
-					# self.enemy_state.update_moves_list(pokemon, params[1])
-					self.log('P1 used: ', params[1])
-					self.log('Enemy Moves State:', self.enemy_state.team_moves)
-				else:
-					# player 2 pokemon used move.
-					my_move = params[1]
-					self.log('P2 used: ', my_move)
+				'''
+				move|POKEMON|MOVE|TARGET
+				The specified Pokémon has used move MOVE at TARGET. 
+				If a move has multiple targets or no target, TARGET should be ignored. 
+				If a move targets a side, TARGET will be a (possibly fainted) Pokémon on that side.
+				If |[miss] is present, the move missed.
+				'''
+				if len(params) == 4:
+					if params[3] == '[zeffect]':
+						if self.get_owner(params[0]) == 'p1a':
+							pokemon_name = self.get_pokemon(params[0])
+							zmove_id = util.move_name_to_id(params[1])
+							# Add (pokemon : zmove) in the zmove_tracker to
+							# ensure, this pokemon can't re-use zmove
+							self.zmoves_tracker[pokemon_name] = zmove_name
+							self.gs.set_move(GameState.Player.one, pokemon_name, zmove_id, 0.0, 1.0)
 
 			elif inp_type == '-zpower':
-				if ('p1a' in str(params[0])):
-					# opposing player used Z Power
-					pokemon = params[0].strip('p1a: ')
-					# self.enemy_state.update_used_zpower(pokemon)
-					self.opp_zpower = True
-				else:
-					# Add which pokemon used the zpower obviously but should discuss data structure 
-					# and design of objects first.
-					self.z_power = True
+				'''
+				|-zpower|POKEMON
+				The Pokémon POKEMON has used the z-move version of its move.
+
+				Note:
+					Kept for legacy and inclusiveness reasons
+					Actual tracking of zpower done in the '-move'
+					hook
+				'''
+				pass
 
 			elif inp_type == '-weather':
 				weather_name = params[0]
