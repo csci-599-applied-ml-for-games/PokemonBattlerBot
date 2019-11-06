@@ -393,6 +393,8 @@ class GameState():
 
 	def clear_all_weather(self):
 		for weather_name in WEATHER_NAME_TO_INDEX:
+			if weather_name in ['Min', 'Count']:
+				continue
 			self._set_weather(weather_name, 0.0)
 
 	def clear_weather(self, weather_name):
