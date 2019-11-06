@@ -551,7 +551,7 @@ class GameState():
 			index = ACTIVE_TYPE_NAME_TO_INDEX[get_type_name]
 			value = self.get_player_attribute(player, index)
 			if value == 1.0:
-				types.append((get_type_name, value))
+				types.append(get_type_name)
 
 		statuses = []
 		for get_status_name in ACTIVE_STATUS_NAME_TO_INDEX:
@@ -629,7 +629,7 @@ class GameState():
 
 		start_of_move_indices = start_of_pokemon(player, team_position)
 		for move_index in range(start_checking, end_checking):
-			if self.vector_list[move_index] == 1.0:
+			if self.vector_list[move_index] > 0.0:
 				moves.append(INDEX_TO_MOVE_NAME[move_index - 
 					start_of_move_indices])
 		return moves
