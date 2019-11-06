@@ -335,6 +335,7 @@ class BotClient(showdown.Client):
 				self.log(f'{vector_pokemon} has types {has_types}')
 
 	def log_error(self, err):
+		self.log('ERROR')
 		self.log(''.join(traceback.format_tb(err.__traceback__)))
 
 	async def on_receive(self, room_id, inp_type, params):
