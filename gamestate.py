@@ -551,7 +551,6 @@ class GameState():
 			if get_pokemon_name in ['Min', 'Count']:
 				continue
 			index = ACTIVE_POKEMON_NAME_TO_INDEX[get_pokemon_name]
-			print(f'{get_pokemon_name}, {index}')
 			if self.get_player_attribute(player, index) == 1.0:
 				pokemon_names.append(get_pokemon_name)
 		
@@ -750,6 +749,8 @@ class GameState():
 
 	def reset_boosts(self, player):
 		for boost_name in ACTIVE_POKEMON_BOOST:
+			if boost_name in ['Min', 'Count']:
+				continue
 			self.set_boost(player, boost_name, 0.5)
 
 	def _set_boost(self, player, boost_position, value):
@@ -775,6 +776,8 @@ class GameState():
 	def all_boosts(self, player):
 		boosts = []
 		for boost_name in ACTIVE_POKEMON_BOOST:
+			if boost_name in ['Min', 'Count']:
+				continue
 			boosts.append((boost_name, self.get_boost(player, boost_name)))
 		return boosts
 
