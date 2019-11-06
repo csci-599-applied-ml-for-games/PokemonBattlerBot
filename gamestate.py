@@ -128,6 +128,7 @@ ACTIVE_STATUS_NAME_TO_INDEX = {
 	'psn': increment_team_index(),
 	'tox': increment_team_index(),
 	'confusion': increment_team_index(),
+	'curse': increment_team_index(),
 	'flinch': increment_team_index(),
 	'trapped': increment_team_index(),
 	'trapper': increment_team_index(),
@@ -253,6 +254,7 @@ STATUS_NAME_TO_INDEX = {
 	'psn': increment_index(),
 	'tox': increment_index(),
 	'confusion': increment_index(),
+	'curse': increment_index(),
 	'flinch': increment_index(),
 	'trapped': increment_index(),
 	'trapper': increment_index(),
@@ -435,7 +437,9 @@ class GameState():
 	def set_health(self, player, name, value):
 		position = self.name_to_position[player][name]
 		self._set_health(player, position, value)
-		self.set_player_attribute(player, ACTIVE_NORMALIZED_HEALTH, value)
+		
+		if self.check_active(player, name):
+			self.set_player_attribute(player, ACTIVE_NORMALIZED_HEALTH, value)
 
 	def init_health(self, player):
 		for team_position in range(len(self.name_to_position[player])):
@@ -498,6 +502,8 @@ class GameState():
 		self._set_active(player, team_position, 1.0)
 		
 		for set_pokemon_name in ACTIVE_POKEMON_NAME_TO_INDEX:
+			if set_pokemon_name in ['Min', 'Count']:
+				continue
 			index = ACTIVE_POKEMON_NAME_TO_INDEX[set_pokemon_name]
 			if set_pokemon_name == name:
 				self.set_player_attribute(player, index, 1.0)
@@ -506,6 +512,8 @@ class GameState():
 		
 		moves = self.check_moves(player, name)
 		for set_move_name in ACTIVE_MOVE_NAME_TO_INDEX:
+			if set_move_name in ['Min', 'Count']:
+				continue
 			index = ACTIVE_MOVE_NAME_TO_INDEX[set_move_name]
 			if set_move_name in moves:
 				self.set_player_attribute(player, index, 
@@ -516,6 +524,8 @@ class GameState():
 
 		types = self.check_types(player, name)
 		for set_type_name in ACTIVE_TYPE_NAME_TO_INDEX:
+			if set_type_name in ['Min', 'Count']:
+				continue
 			index = ACTIVE_TYPE_NAME_TO_INDEX[set_type_name]
 			if set_type_name in types:
 				self.set_player_attribute(player, index, 1.0)
@@ -524,6 +534,8 @@ class GameState():
 
 		statuses = self.check_status(player, name)
 		for set_status_name in ACTIVE_STATUS_NAME_TO_INDEX:
+			if set_status_name in ['Min', 'Count']:
+				continue
 			index = ACTIVE_STATUS_NAME_TO_INDEX[set_status_name]
 			if set_status_name in statuses:
 				self.set_player_attribute(player, index, 1.0)
@@ -536,12 +548,17 @@ class GameState():
 	def check_active_slot(self, player):
 		pokemon_names = []
 		for get_pokemon_name in ACTIVE_POKEMON_NAME_TO_INDEX:
+			if get_pokemon_name in ['Min', 'Count']:
+				continue
 			index = ACTIVE_POKEMON_NAME_TO_INDEX[get_pokemon_name]
+			print(f'{get_pokemon_name}, {index}')
 			if self.get_player_attribute(player, index) == 1.0:
 				pokemon_names.append(get_pokemon_name)
 		
 		moves = []
 		for get_move_name in ACTIVE_MOVE_NAME_TO_INDEX:
+			if get_move_name in ['Min', 'Count']:
+				continue
 			index = ACTIVE_MOVE_NAME_TO_INDEX[get_move_name]
 			value = self.get_player_attribute(player, index)
 			if value > 0.0:
@@ -549,6 +566,8 @@ class GameState():
 
 		types = []
 		for get_type_name in ACTIVE_TYPE_NAME_TO_INDEX:
+			if get_type_name in ['Min', 'Count']:
+				continue
 			index = ACTIVE_TYPE_NAME_TO_INDEX[get_type_name]
 			value = self.get_player_attribute(player, index)
 			if value == 1.0:
@@ -556,6 +575,8 @@ class GameState():
 
 		statuses = []
 		for get_status_name in ACTIVE_STATUS_NAME_TO_INDEX:
+			if get_status_name in ['Min', 'Count']:
+				continue
 			index = ACTIVE_STATUS_NAME_TO_INDEX[get_status_name]
 			value = self.get_player_attribute(player, index)
 			if value == 1.0:
@@ -689,16 +710,20 @@ class GameState():
 		status_position = STATUS_NAME_TO_INDEX.get(status_name, STATUS_NAME_TO_INDEX['NotFound'])
 		self._set_status(player, team_position, status_position, 1.0)
 
-		index = ACTIVE_STATUS_NAME_TO_INDEX[status_name]
-		self.set_player_attribute(player, index, 1.0)
+		if self.check_active(player, name):
+			index = ACTIVE_STATUS_NAME_TO_INDEX.get(status_name, 
+				ACTIVE_STATUS_NAME_TO_INDEX['NotFound'])
+			self.set_player_attribute(player, index, 1.0)
 	
 	def remove_status(self, player, name, status_name):
 		team_position = self.name_to_position[player][name]
 		status_position = STATUS_NAME_TO_INDEX.get(status_name, STATUS_NAME_TO_INDEX['NotFound'])
 		self._set_status(player, team_position, status_position, 0.0)
 		
-		index = ACTIVE_STATUS_NAME_TO_INDEX[status_name]
-		self.set_player_attribute(player, index, 0.0)
+		if self.check_active(player, name):
+			index = ACTIVE_STATUS_NAME_TO_INDEX.get(status_name, 
+				ACTIVE_STATUS_NAME_TO_INDEX['NotFound'])
+			self.set_player_attribute(player, index, 0.0)
 
 	def check_status(self, player, name):
 		name = GameState.pokemon_name_clean(name)
