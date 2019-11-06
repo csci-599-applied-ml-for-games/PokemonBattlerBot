@@ -435,6 +435,7 @@ class GameState():
 	def set_health(self, player, name, value):
 		position = self.name_to_position[player][name]
 		self._set_health(player, position, value)
+		self.set_player_attribute(player, ACTIVE_NORMALIZED_HEALTH, value)
 
 	def init_health(self, player):
 		for team_position in range(len(self.name_to_position[player])):
@@ -556,7 +557,7 @@ class GameState():
 		statuses = []
 		for get_status_name in ACTIVE_STATUS_NAME_TO_INDEX:
 			index = ACTIVE_STATUS_NAME_TO_INDEX[get_status_name]
-			self.get_player_attribute(player, index)
+			value = self.get_player_attribute(player, index)
 			if value == 1.0:
 				statuses.append((get_status_name, value))
 
@@ -617,7 +618,11 @@ class GameState():
 	def set_move(self, player, pokemon_name, move_name, pp, max_pp):
 		team_position = self.name_to_position[player][pokemon_name]
 		move_position = MOVE_NAME_TO_INDEX.get(move_name, MOVE_NAME_TO_INDEX['NotFound'])
-		self._set_move(player, team_position, move_position, pp/max_pp)
+		value = float(pp) / float(max_pp)
+		self._set_move(player, team_position, move_position, value)
+
+		index = ACTIVE_MOVE_NAME_TO_INDEX[move_name]
+		self.set_player_attribute(player, index, value)
 
 	def check_moves(self, player, pokemon_name):
 		pokemon_name = GameState.pokemon_name_clean(pokemon_name)
@@ -683,11 +688,17 @@ class GameState():
 		team_position = self.name_to_position[player][name]
 		status_position = STATUS_NAME_TO_INDEX.get(status_name, STATUS_NAME_TO_INDEX['NotFound'])
 		self._set_status(player, team_position, status_position, 1.0)
+
+		index = ACTIVE_STATUS_NAME_TO_INDEX[status_name]
+		self.set_player_attribute(player, index, 1.0)
 	
 	def remove_status(self, player, name, status_name):
 		team_position = self.name_to_position[player][name]
 		status_position = STATUS_NAME_TO_INDEX.get(status_name, STATUS_NAME_TO_INDEX['NotFound'])
 		self._set_status(player, team_position, status_position, 0.0)
+		
+		index = ACTIVE_STATUS_NAME_TO_INDEX[status_name]
+		self.set_player_attribute(player, index, 0.0)
 
 	def check_status(self, player, name):
 		name = GameState.pokemon_name_clean(name)
