@@ -42,6 +42,17 @@ from dqn import DQNAgent, ActionType
 LOGS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
 BOT_DIR = os.path.dirname(__file__)
 TYPE_MAP = {}
+with open(os.path.join(BOT_DIR, 'data/PokemonTypes.csv'), 'r') as typefile:
+	reader = csv.reader(typefile, delimiter=',')		
+	for row in reader:
+		name = row[1]
+		type1 = row[2]
+		type2 = row[3]
+		TYPE_MAP[name] = []
+		if type1 != '':
+			TYPE_MAP[name].append(type1)
+		if type2 != '':
+			TYPE_MAP[name].append(type2)
 
 INPUT_SHAPE = (GameState.vector_dimension(),)
 		
@@ -126,7 +137,7 @@ class BotClient(showdown.Client):
 	def __init__(self, name='', password='', loop=None, max_room_logs=5000,
 		server_id='showdown', server_host=None, expected_opponent=None,
 		team=None, challenge=False, runType=RunType.Iterations, runTypeData=1,
-		agent=None, print_stats=False, trainer=False):
+		agent=None, print_stats=False, trainer=False, save_model=True):
 
 		if expected_opponent == None:
 			raise Exception("No expected opponent found in arguments")
@@ -177,6 +188,10 @@ class BotClient(showdown.Client):
 		self.print_stats = print_stats
 
 		self.trainer = trainer
+
+		self.save_model = save_model
+
+		self.last_action_time = time.time()
 
 		super().__init__(name=name, password=password, loop=loop, 
 			max_room_logs=max_room_logs, server_id=server_id, 
@@ -257,6 +272,8 @@ class BotClient(showdown.Client):
 	async def take_action(self, room_obj, data, delay=0):
 		await asyncio.sleep(delay) 
 		#NOTE: delay is here to make sure we get all the data before taking action
+
+		self.last_action_time = time.time()
 		try:
 			moves = data.get('active')[0].get('moves')
 			valid_actions = []
@@ -655,15 +672,16 @@ class BotClient(showdown.Client):
 					self.log(f'Successfully updated replay memory')
 					trained = self.agent.train(True)
 					if trained:
-						self.log(f'Trained')
-						path = self.agent.save_model()
+						if self.save_model:
+							path = self.agent.save_model()
 						old_epoch = self.agent.current_epoch
 						epoch = self.agent.update_epoch()
 						if old_epoch < epoch:
 							self.log('Saving epoch model')
 							epoch_model_path = os.path.join(self.logs_dir, 
 								f'Epoch{epoch}.model')
-							self.agent.save_model(path=epoch_model_path)
+							if self.save_model:
+								self.agent.save_model(path=epoch_model_path)
 							self.agent.restart_epoch()
 					else:
 						self.log(f'Not trained')
@@ -900,6 +918,9 @@ class BotClient(showdown.Client):
 			self.opp_active_pokemon = None
 			self.weather = 'none'
 
+	def kill(self):
+		sys.exit(0)
+
 def main():
 	args = docopt(__doc__) 
 
@@ -942,18 +963,6 @@ def main():
 
 	with open(os.path.join(BOT_DIR, 'teams/PokemonTeam'), 'rt') as teamfd:
 		team = teamfd.read()
-	
-	with open(os.path.join(BOT_DIR, 'data/PokemonTypes.csv'), 'r') as typefile:
-		reader = csv.reader(typefile, delimiter=',')		
-		for row in reader:
-			name = row[1]
-			type1 = row[2]
-			type2 = row[3]
-			TYPE_MAP[name] = []
-			if type1 != '':
-				TYPE_MAP[name].append(type1)
-			if type2 != '':
-				TYPE_MAP[name].append(type2)
 
 	if model_type == 'dqn':
 		if not trainer:
