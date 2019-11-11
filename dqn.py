@@ -22,7 +22,6 @@ LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
 DISCOUNT = 0.85
 REPLAY_MEMORY_SIZE = 50_000
 MIN_REPLAY_MEMORY_SIZE = 1000
-MINIBATCH_SIZE = 64
 
 class ActionType(Enum):
 	Move = auto()
@@ -34,7 +33,8 @@ MAX_ACTION_SPACE_SIZE = (MOVE_NAME_TO_INDEX['Count'] +
 
 class DQNAgent():
 	def __init__(self, input_shape, log_path=None, replay_memory_path=None, 
-		model_path=None, training=True, epsilon_decay=0.99):
+		model_path=None, training=True, epsilon_decay=0.99, epsilon=1, 
+		replay_memory=None, random_moves=None, target_model_path=None):
 
 		self.current_epoch = 0
 		self.decay_iterations = 0
@@ -44,13 +44,23 @@ class DQNAgent():
 
 		self.model = self.create_model()
 
-		self.target_model = self.create_model()
-		self.target_model.set_weights(self.model.get_weights())
+		if target_model_path == None:
+			self.target_model = self.create_model()
+			self.target_model.set_weights(self.model.get_weights())
+		else:
+			
 
 		#TODO: don't initialize dequeue if not training
-		self.replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
+		if replay_memory == None:
+			self.replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
+		else:
+			self.replay_memory = replay_memory
 
-		self.epsilon = 1 
+		if random_moves == None:
+			self.random_moves = training
+		else:
+			self.random_moves = random_moves
+		self.epsilon = epsilon
 		self.epsilon_decay = epsilon_decay
 		self.min_epsilon = 0.001
 
@@ -141,7 +151,7 @@ class DQNAgent():
 				(action_index, action_name, action_type)))
 
 		#NOTE: As epsilon grows small, we make fewer random choices
-		if self.training and random.random() <= self.epsilon: 
+		if self.random_moves and random.random() <= self.epsilon: 
 			self.log(f'Making random choice (epsilon {self.epsilon})')
 			q_index, q_value, action = random.choice(formatted_actions)
 		else:
