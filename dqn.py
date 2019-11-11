@@ -34,7 +34,8 @@ MAX_ACTION_SPACE_SIZE = (MOVE_NAME_TO_INDEX['Count'] +
 
 class DQNAgent():
 	def __init__(self, input_shape, log_path=None, replay_memory_path=None, 
-		model_path=None, training=True, epsilon_decay=0.99):
+		model_path=None, training=True, epsilon=1, epsilon_decay=0.99, 
+		random_moves=None, copy_target_model=True, replay_memory=None):
 
 		self.current_epoch = 0
 		self.decay_iterations = 0
@@ -45,12 +46,14 @@ class DQNAgent():
 		self.model = self.create_model()
 
 		self.target_model = self.create_model()
-		self.target_model.set_weights(self.model.get_weights())
+		if copy_target_model:
+			self.target_model.set_weights(self.model.get_weights())
 
 		#TODO: don't initialize dequeue if not training
-		self.replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
+		if replay_memory == None:
+			self.replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
 
-		self.epsilon = 1 
+		self.epsilon = epsilon
 		self.epsilon_decay = epsilon_decay
 		self.min_epsilon = 0.001
 
@@ -62,6 +65,10 @@ class DQNAgent():
 		self.model_path = model_path
 
 		self.training = training
+		if random_moves == None:
+			self.random_moves = self.training
+		else:
+			self.random_moves = random_moves
 
 	def create_model(self):
 		model = Sequential()
