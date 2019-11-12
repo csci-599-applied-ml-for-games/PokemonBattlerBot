@@ -20,7 +20,7 @@ from keras.optimizers import Adam
 LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
 
 DISCOUNT = 0.85
-REPLAY_MEMORY_SIZE = 50_000
+REPLAY_MEMORY_SIZE = 100_000
 MIN_REPLAY_MEMORY_SIZE = 1000
 MINIBATCH_SIZE = 64
 
@@ -31,6 +31,16 @@ class ActionType(Enum):
 #TODO: handle mega
 MAX_ACTION_SPACE_SIZE = (MOVE_NAME_TO_INDEX['Count'] + 
 	POKEMON_NAME_TO_INDEX['Count'])
+
+def create_model(input_shape):
+	model = Sequential()
+
+	model.add(Dense(128, input_shape=input_shape)) 
+	model.add(Dense(128, activation='relu')) 
+	model.add(Dense(MAX_ACTION_SPACE_SIZE, activation='linear'))
+	model.compile(loss='mse', optimizer=Adam(lr=0.001), 
+		metrics=['accuracy'])
+	return model
 
 class DQNAgent():
 	def __init__(self, input_shape, log_path=None, replay_memory_path=None, 
@@ -71,14 +81,7 @@ class DQNAgent():
 			self.random_moves = random_moves
 
 	def create_model(self):
-		model = Sequential()
-
-		model.add(Dense(128, input_shape=self.input_shape)) 
-		model.add(Dense(128, activation='relu')) 
-		model.add(Dense(MAX_ACTION_SPACE_SIZE, activation='linear'))
-		model.compile(loss='mse', optimizer=Adam(lr=0.001), 
-			metrics=['accuracy'])
-		return model
+		return create_model(self.input_shape)
 
 	def update_replay_memory(self, transition):
 		self.replay_memory.append(transition)
@@ -159,22 +162,19 @@ class DQNAgent():
 		self.log(f'Choice was {action}')
 		return action + (q_index,)
 
-	def train(self, terminal_state):
-		if not self.training:
-			return False
-
+	def train_only(self, minibatch_size, min_replay_memory_size):
 		self.log('Saving replay_memory')
 		if self.replay_memory_path:
 			with open(self.replay_memory_path, 'w') as fd:
 				fd.write(f'{self.replay_memory}')
 		self.log('Saved replay_memory')
 
-		if len(self.replay_memory) < MIN_REPLAY_MEMORY_SIZE:
+		if len(self.replay_memory) < min_replay_memory_size:
 			self.log(f'Not enough transitions to train. '
 				f'Only {len(self.replay_memory)} transitions')
 			return False
 
-		minibatch = random.sample(self.replay_memory, MINIBATCH_SIZE)
+		minibatch = random.sample(self.replay_memory, minibatch_size)
 
 		current_states = np.array([transition[0] for transition in minibatch])
 		current_qs_list = self.model.predict(current_states)
@@ -200,8 +200,17 @@ class DQNAgent():
 			X.append(current_state)
 			y.append(current_qs)
 
-		self.model.fit(np.array(X), np.array(y), batch_size=MINIBATCH_SIZE, 
-			verbose=0, shuffle=False) 
+		history = self.model.fit(np.array(X), np.array(y), 
+			batch_size=minibatch_size, verbose=0, shuffle=False) 
+		return history
+
+	def train(self, terminal_state, minibatch_size=MINIBATCH_SIZE, 
+		min_replay_memory_size=MIN_REPLAY_MEMORY_SIZE):
+		
+		if not self.training:
+			return False
+
+		self.train_only(minibatch_size, min_replay_memory_size)
 
 		if terminal_state:
 			self.target_update_counter += 1

@@ -1,4 +1,4 @@
-from threading import Thread
+from multiprocessing import Process
 
 MIN_REPLAY_MEMORY_SIZE = 3000
 
@@ -39,56 +39,92 @@ if __name__ == '__main__':
 	epsilon = 1
 	epsilon_decay = 0.99
 	min_epsilon = 0.001
-
-	replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
+	epochs = 1
 
 	#NOTE: get the account information
 	un1, pw1 = ('USCBot9', 'USCBot9')
 	un2, pw2 = ('USCBot10', 'USCBot10')
+	agent = None
+	for epoch in range(epochs):
+		replay_memory = deque(REPLAY_MEMORY_SIZE)
+		if epoch == 0:
+			model = create_model(INPUT_SHAPE)
+		else:
+			model = agent.model
 
-	#NOTE: start two threads for each game 
-	game_index = 0
-	GAME_INFO[game_index].start_time = time.time()
-	GAME_INFO[game_index].bots = []
+		iteration = 0
+		original_model_path = os.path.join(LOGS_DIR, f'Epoch{epoch}_Iteration{iteration}.model')
+		model.save(original_model_path)
+		model_path = original_model_path
+		
+		while True:
+			#TODO: define model_path
+			#NOTE: start two threads for each game 
+			game_index = 0
+			GAME_INFO[game_index].start_time = time.time()
+			GAME_INFO[game_index].bots = []
 
-	bot1_thread = Thread(target=make_bot, args=(un1, pw1, un2, team, False,  
-		False, replay_memory, game_index), daemon=True) #TODO: add the model_path and target_model_path
-	bot1_thread.start()
+			bot1_thread = Process(target=make_bot, 
+				args=(un1, pw1, un2, team, False,  False, replay_memory, game_index), 
+				kwargs={'model_path': model_path, 'target_model_path': target_model_path}, 
+				daemon=True) #TODO: add the model_path and target_model_path
+			bot1_thread.start()
 
-	time.sleep(5) #NOTE: the challenger needs to come a little after the other bot is set up
+			time.sleep(5) #NOTE: the challenger needs to come a little after the other bot is set up
 
-	bot2_thread = Thread(target=make_bot, args=(un2, pw2, un1, team, False,  
-		False, replay_memory, game_index), daemon=True) #TODO: add the model_path
-	bot2_thread.start()
-	
-	#NOTE: wait until all games finish
-	any_alive = True
-	while any_alive:
-		any_alive = False
-		#NOTE: check if any bots have stalled for more than 20 minutes
-		for game_info in GAME_INFO:
-			if time.time() - game_info.start_time > timeout:
-				for bot in game_info.bots:
-					bot.kill() #TODO: define kill in bot.py
+			if epoch == 0:
+				trainer_model_path = None
 			else:
-				for thread in game_info.threads:
-					if thread.is_alive():
-						any_alive = True
+				trainer_model_path = original_model_path
+			bot2_thread = Process(target=make_bot, 
+				args=(un2, pw2, un1, team, False,  False, replay_memory, game_index),
+				kwargs=('model_path': model_path), 
+				daemon=True) #TODO: add the model_path
+			bot2_thread.start()
+			
+			#NOTE: wait until all games finish
+			any_alive = True
+			while any_alive:
+				any_alive = False
+				#NOTE: check if any bots have stalled for more than 20 minutes
+				for game_info in GAME_INFO:
+					if time.time() - game_info.start_time > timeout:
+						for bot in game_info.bots:
+							bot.kill() #TODO: define kill in bot.py
+					else:
+						for thread in game_info.threads:
+							if thread.is_alive():
+								any_alive = True
 
-	#NOTE: train
-	#NOTE: create/load DQN and target DQN in main thread
-	#NOTE: train newly loaded model
+			#NOTE: train
+			#NOTE: create/load DQN and target DQN in main thread
+			agent = DQNAgent(INPUT_SHAPE, training=True, replay_memory=replay_memory)
+			#NOTE: train newly loaded model
+			history = agent.train_only(MIN_REPLAY_MEMORY_SIZE, MIN_REPLAY_MEMORY_SIZE)
 
-	#NOTE: decay epsilon
-	if epsilon > min_epsilon and len(replay_memory) > MIN_REPLAY_MEMORY_SIZE:
-		epsilon *= min_epsilon
+			#NOTE: decay epsilon
+			if epsilon > min_epsilon and len(replay_memory) > MIN_REPLAY_MEMORY_SIZE:
+				epsilon *= epsilon_decay
+				if epsilon < min_epsilon:
+					epsilon = min_epsilon
+					min_epsilon_iterations = 0
+			elif epsilon <= min_epsilon:
+				min_epsilon_iterations += 1
 
-	#NOTE: check if we should update target models
-	if target_update_counter > update_target_every:
-		target_update_counter = 0
-		#TODO: save new target model
-	else:
-		target_update_counter += 1
 
-	#NOTE: check if we should move to the next epoch
-	#TODO: implement checking for next epoch
+			#NOTE: check if we should update target models
+			if target_update_counter > update_target_every:
+				target_update_counter = 0
+				target_model_path = model_path
+			elif len(replay_memory) > MIN_REPLAY_MEMORY_SIZE:
+				target_update_counter += 1
+
+			#NOTE: update model_path
+			iteration += 1
+			model_path = os.path.join(LOGS_DIR, f'Epoch{epoch}_Iteration{iteration}.model')
+			agent.save_model(model_path)
+
+			#NOTE: check if we should move to the next epoch
+			#TODO: implement checking for next epoch
+			print(history.history.keys())
+			break
