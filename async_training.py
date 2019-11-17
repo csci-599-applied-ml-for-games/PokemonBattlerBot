@@ -115,10 +115,10 @@ if __name__ == '__main__':
 					trainer_model_path = original_model_path
 				bot2_process = Process(target=make_bot, 
 					args=(
-						un2, pw2, un1, team, False,  False, replay_memory, 
+						un2, pw2, un1, team, True, True, replay_memory, 
 						games_info, game_index
 					),
-					kwargs={'model_path': model_path}, 
+					kwargs={'model_path': trainer_model_path}, 
 					daemon=True) #TODO: add the model_path
 				bot2_process.start()
 
