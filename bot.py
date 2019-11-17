@@ -42,6 +42,17 @@ from dqn import DQNAgent, ActionType
 LOGS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
 BOT_DIR = os.path.dirname(__file__)
 TYPE_MAP = {}
+with open(os.path.join(BOT_DIR, 'data/PokemonTypes.csv'), 'r') as typefile:
+	reader = csv.reader(typefile, delimiter=',')		
+	for row in reader:
+		name = row[1]
+		type1 = row[2]
+		type2 = row[3]
+		TYPE_MAP[name] = []
+		if type1 != '':
+			TYPE_MAP[name].append(type1)
+		if type2 != '':
+			TYPE_MAP[name].append(type2)
 
 INPUT_SHAPE = (GameState.vector_dimension(),)
 		
@@ -946,18 +957,6 @@ def main():
 
 	with open(os.path.join(BOT_DIR, 'teams/PokemonTeam'), 'rt') as teamfd:
 		team = teamfd.read()
-	
-	with open(os.path.join(BOT_DIR, 'data/PokemonTypes.csv'), 'r') as typefile:
-		reader = csv.reader(typefile, delimiter=',')		
-		for row in reader:
-			name = row[1]
-			type1 = row[2]
-			type2 = row[3]
-			TYPE_MAP[name] = []
-			if type1 != '':
-				TYPE_MAP[name].append(type1)
-			if type2 != '':
-				TYPE_MAP[name].append(type2)
 
 	if model_type == 'dqn':
 		if not trainer:
