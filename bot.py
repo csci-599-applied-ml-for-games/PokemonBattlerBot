@@ -126,7 +126,7 @@ class BotClient(showdown.Client):
 	def __init__(self, name='', password='', loop=None, max_room_logs=5000,
 		server_id='showdown', server_host=None, expected_opponent=None,
 		team=None, challenge=False, runType=RunType.Iterations, runTypeData=1,
-		agent=None, print_stats=False, trainer=False):
+		agent=None, print_stats=False, trainer=False, save_model=True):
 
 		if expected_opponent == None:
 			raise Exception("No expected opponent found in arguments")
@@ -654,7 +654,7 @@ class BotClient(showdown.Client):
 					self.agent.update_replay_memory(transition)
 					self.log(f'Successfully updated replay memory')
 					trained = self.agent.train(True)
-					if trained:
+					if trained and self.save_model:
 						self.log(f'Trained')
 						path = self.agent.save_model()
 						old_epoch = self.agent.current_epoch
