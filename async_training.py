@@ -16,17 +16,15 @@ INPUT_SHAPE = (GameState.vector_dimension(),)
 
 MIN_REPLAY_MEMORY_SIZE = 3000
 
-GAME_INFO = []
 class GameInfo():
-	start_time = 0.0
-	threads = []
-	bots = []
-
 	def __init__(self):
-		pass
+		self.start_time = 0.0
+		self.processes = []
+		self.bots = []
 
 def make_bot(un, pw, expected_opponent, team, challenge, 
-	trainer, replay_memory, game_index, epsilon=None, model_path=None, target_model_path=None):
+	trainer, replay_memory, games_info, game_index, epsilon=None, 
+	model_path=None, target_model_path=None):
 	
 	if trainer:
 		if model_path:
@@ -38,7 +36,7 @@ def make_bot(un, pw, expected_opponent, team, challenge,
 			training=False, copy_target_model=False, 
 			replay_memory=replay_memory)
 		agent.load_model(model_path)
-		if target_model_path == None:
+		if target_model_path != None:
 			agent.target_model = load_model(target_model_path)
 		else:
 			agent.target_model.set_weights(agent.model.get_weights())
@@ -47,7 +45,7 @@ def make_bot(un, pw, expected_opponent, team, challenge,
 		expected_opponent=expected_opponent, team=team, 
 		challenge=challenge, runType=RunType.Iterations, runTypeData=1, 
 		agent=agent, trainer=trainer, save_model=False)
-	GAME_INFO[game_index].bots.append(bot)
+	games_info[game_index].bots.append(bot)
 	bot.start()
 
 if __name__ == '__main__':
@@ -57,7 +55,7 @@ if __name__ == '__main__':
 	min_epsilon = 0.001
 	epochs = 1
 	games_to_play = 1
-	GAME_INFO = [GameInfo() for _ in range(games_to_play)]
+	games_info = [GameInfo() for _ in range(games_to_play)]
 	accounts = [
 		('USCBot9', 'USCBot9'),
 		('USCBot10', 'USCBot10')
@@ -85,7 +83,7 @@ if __name__ == '__main__':
 		target_update_counter = 0
 
 		while True:
-			#NOTE: start two threads for each game 
+			#NOTE: start two processes for each game 
 			for game_index in range(games_to_play): 
 				#NOTE: get the account information
 				account1 = accounts[2 * game_index]
@@ -93,15 +91,21 @@ if __name__ == '__main__':
 				un1, pw1 = account1
 				un2, pw2 = account2
 				
-				GAME_INFO[game_index].start_time = time.time()
-				GAME_INFO[game_index].bots = []
+				games_info[game_index].bots = []
+				games_info[game_index].processes = []
 
-				bot1_thread = Process(target=make_bot, 
-					args=(un1, pw1, un2, team, False,  False, replay_memory, 
-						game_index, epsilon), 
-					kwargs={'model_path': model_path, 'target_model_path': target_model_path}, 
+				bot1_process = Process(target=make_bot, 
+					args=(
+						un1, pw1, un2, team, False,  False, replay_memory, 
+						games_info, game_index
+					), 
+					kwargs={
+						'model_path': model_path, 
+						'target_model_path': target_model_path,
+						'epsilon': epsilon
+					}, 
 					daemon=True)
-				bot1_thread.start()
+				bot1_process.start()
 
 				time.sleep(5) #NOTE: the challenger needs to come a little after the other bot is set up
 
@@ -109,29 +113,40 @@ if __name__ == '__main__':
 					trainer_model_path = None
 				else:
 					trainer_model_path = original_model_path
-				bot2_thread = Process(target=make_bot, 
-					args=(un2, pw2, un1, team, False,  False, replay_memory, game_index),
+				bot2_process = Process(target=make_bot, 
+					args=(
+						un2, pw2, un1, team, False,  False, replay_memory, 
+						games_info, game_index
+					),
 					kwargs={'model_path': model_path}, 
 					daemon=True) #TODO: add the model_path
-				bot2_thread.start()
-			
+				bot2_process.start()
+
+				games_info[game_index].start_time = time.time()
+				games_info[game_index].processes.append(bot1_process)
+				games_info[game_index].processes.append(bot2_process)
+
 			#NOTE: wait until all games finish
 			any_alive = True
 			while any_alive:
 				any_alive = False
-				#NOTE: check if any bots have stalled for more than 20 minutes
-				for game_info in GAME_INFO:
+				#NOTE: check if any bots have stalled for more than the timeout
+				for game_info in games_info:
 					if time.time() - game_info.start_time > timeout:
 						for bot in game_info.bots:
 							bot.kill() 
 					else:
-						for thread in game_info.threads:
-							if thread.is_alive():
+						for process in game_info.processes:
+							if process.is_alive():
 								any_alive = True
 
 			#NOTE: train
 			#NOTE: create/load DQN and target DQN in main thread
-			agent = DQNAgent(INPUT_SHAPE, training=True, replay_memory=replay_memory)
+			agent = DQNAgent(
+				INPUT_SHAPE, training=True, replay_memory=replay_memory, 
+				copy_target_model=False
+			)
+			agent.target_model = load_model(target_model_path)
 			#NOTE: train newly loaded model
 			history = agent.train_only(MIN_REPLAY_MEMORY_SIZE, MIN_REPLAY_MEMORY_SIZE)
 
@@ -159,5 +174,5 @@ if __name__ == '__main__':
 
 			#NOTE: check if we should move to the next epoch
 			#TODO: implement checking for next epoch
-			print(history.history.keys())
+			# print(history.history.keys())
 			break
