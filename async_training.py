@@ -22,13 +22,15 @@ class GameInfo():
 	threads = []
 	bots = []
 
+	def __init__(self):
+		pass
+
 def make_bot(un, pw, expected_opponent, team, challenge, 
-	trainer, replay_memory, game_index, model_path=None, target_model_path=None):
+	trainer, replay_memory, game_index, epsilon=None, model_path=None, target_model_path=None):
 	
 	if trainer:
 		if model_path:
-			agent = DQNAgent(INPUT_SHAPE, epsilon=epsilon, random_moves=True, 
-				training=False)
+			agent = DQNAgent(INPUT_SHAPE, training=False)
 		else:
 			agent = RandomAgent()
 	else:
@@ -54,13 +56,17 @@ if __name__ == '__main__':
 	epsilon_decay = 0.99
 	min_epsilon = 0.001
 	epochs = 1
+	games_to_play = 1
+	GAME_INFO = [GameInfo() for _ in range(games_to_play)]
+	accounts = [
+		('USCBot9', 'USCBot9'),
+		('USCBot10', 'USCBot10')
+	]
 
 	with open(os.path.join(ASYNC_TRAIN_DIR, 'teams/PokemonTeam'), 'rt') as teamfd:
 		team = teamfd.read()
 
-	#NOTE: get the account information
-	un1, pw1 = ('USCBot9', 'USCBot9')
-	un2, pw2 = ('USCBot10', 'USCBot10')
+	
 	agent = None
 	update_target_every = 5
 	for epoch in range(epochs):
@@ -79,29 +85,35 @@ if __name__ == '__main__':
 		target_update_counter = 0
 
 		while True:
-			#TODO: define model_path
 			#NOTE: start two threads for each game 
-			game_index = 0
-			GAME_INFO[game_index].start_time = time.time()
-			GAME_INFO[game_index].bots = []
+			for game_index in range(games_to_play): 
+				#NOTE: get the account information
+				account1 = accounts[2 * game_index]
+				account2 = accounts[2 * game_index + 1]
+				un1, pw1 = account1
+				un2, pw2 = account2
+				
+				GAME_INFO[game_index].start_time = time.time()
+				GAME_INFO[game_index].bots = []
 
-			bot1_thread = Process(target=make_bot, 
-				args=(un1, pw1, un2, team, False,  False, replay_memory, game_index), 
-				kwargs={'model_path': model_path, 'target_model_path': target_model_path}, 
-				daemon=True)
-			bot1_thread.start()
+				bot1_thread = Process(target=make_bot, 
+					args=(un1, pw1, un2, team, False,  False, replay_memory, 
+						game_index, epsilon), 
+					kwargs={'model_path': model_path, 'target_model_path': target_model_path}, 
+					daemon=True)
+				bot1_thread.start()
 
-			time.sleep(5) #NOTE: the challenger needs to come a little after the other bot is set up
+				time.sleep(5) #NOTE: the challenger needs to come a little after the other bot is set up
 
-			if epoch == 0:
-				trainer_model_path = None
-			else:
-				trainer_model_path = original_model_path
-			bot2_thread = Process(target=make_bot, 
-				args=(un2, pw2, un1, team, False,  False, replay_memory, game_index),
-				kwargs={'model_path': model_path}, 
-				daemon=True) #TODO: add the model_path
-			bot2_thread.start()
+				if epoch == 0:
+					trainer_model_path = None
+				else:
+					trainer_model_path = original_model_path
+				bot2_thread = Process(target=make_bot, 
+					args=(un2, pw2, un1, team, False,  False, replay_memory, game_index),
+					kwargs={'model_path': model_path}, 
+					daemon=True) #TODO: add the model_path
+				bot2_thread.start()
 			
 			#NOTE: wait until all games finish
 			any_alive = True
@@ -111,7 +123,7 @@ if __name__ == '__main__':
 				for game_info in GAME_INFO:
 					if time.time() - game_info.start_time > timeout:
 						for bot in game_info.bots:
-							bot.kill() #TODO: define kill in bot.py
+							bot.kill() 
 					else:
 						for thread in game_info.threads:
 							if thread.is_alive():

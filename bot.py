@@ -900,6 +900,10 @@ class BotClient(showdown.Client):
 			self.opp_active_pokemon = None
 			self.weather = 'none'
 
+	def kill(self):
+		sys.exit(0)
+
+
 def main():
 	args = docopt(__doc__) 
 

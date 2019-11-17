@@ -151,7 +151,7 @@ class DQNAgent():
 				(action_index, action_name, action_type)))
 
 		#NOTE: As epsilon grows small, we make fewer random choices
-		if self.training and random.random() <= self.epsilon: 
+		if (self.training or self.random_moves) and random.random() <= self.epsilon: 
 			self.log(f'Making random choice (epsilon {self.epsilon})')
 			q_index, q_value, action = random.choice(formatted_actions)
 		else:
