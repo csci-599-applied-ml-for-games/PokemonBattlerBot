@@ -1,4 +1,18 @@
+import os
+import time
 from multiprocessing import Process
+from collections import deque
+
+from keras.models import load_model
+
+from dqn import DQNAgent, REPLAY_MEMORY_SIZE, create_model
+from gamestate import GameState
+from bot import RandomAgent, BotClient, RunType
+
+ASYNC_TRAIN_DIR = os.path.dirname(os.path.abspath(__file__))
+LOGS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
+
+INPUT_SHAPE = (GameState.vector_dimension(),)
 
 MIN_REPLAY_MEMORY_SIZE = 3000
 
@@ -41,12 +55,16 @@ if __name__ == '__main__':
 	min_epsilon = 0.001
 	epochs = 1
 
+	with open(os.path.join(ASYNC_TRAIN_DIR, 'teams/PokemonTeam'), 'rt') as teamfd:
+		team = teamfd.read()
+
 	#NOTE: get the account information
 	un1, pw1 = ('USCBot9', 'USCBot9')
 	un2, pw2 = ('USCBot10', 'USCBot10')
 	agent = None
+	update_target_every = 5
 	for epoch in range(epochs):
-		replay_memory = deque(REPLAY_MEMORY_SIZE)
+		replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
 		if epoch == 0:
 			model = create_model(INPUT_SHAPE)
 		else:
@@ -56,7 +74,10 @@ if __name__ == '__main__':
 		original_model_path = os.path.join(LOGS_DIR, f'Epoch{epoch}_Iteration{iteration}.model')
 		model.save(original_model_path)
 		model_path = original_model_path
-		
+		target_model_path = model_path
+
+		target_update_counter = 0
+
 		while True:
 			#TODO: define model_path
 			#NOTE: start two threads for each game 
@@ -67,7 +88,7 @@ if __name__ == '__main__':
 			bot1_thread = Process(target=make_bot, 
 				args=(un1, pw1, un2, team, False,  False, replay_memory, game_index), 
 				kwargs={'model_path': model_path, 'target_model_path': target_model_path}, 
-				daemon=True) #TODO: add the model_path and target_model_path
+				daemon=True)
 			bot1_thread.start()
 
 			time.sleep(5) #NOTE: the challenger needs to come a little after the other bot is set up
@@ -78,7 +99,7 @@ if __name__ == '__main__':
 				trainer_model_path = original_model_path
 			bot2_thread = Process(target=make_bot, 
 				args=(un2, pw2, un1, team, False,  False, replay_memory, game_index),
-				kwargs=('model_path': model_path), 
+				kwargs={'model_path': model_path}, 
 				daemon=True) #TODO: add the model_path
 			bot2_thread.start()
 			
