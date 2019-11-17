@@ -62,6 +62,8 @@ class DQNAgent():
 		#TODO: don't initialize dequeue if not training
 		if replay_memory == None:
 			self.replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
+		else:
+			self.replay_memory = replay_memory
 
 		self.epsilon = epsilon
 		self.epsilon_decay = epsilon_decay
