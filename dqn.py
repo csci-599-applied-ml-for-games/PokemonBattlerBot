@@ -48,7 +48,7 @@ class DQNAgent():
 			self.target_model = self.create_model()
 			self.target_model.set_weights(self.model.get_weights())
 		else:
-			
+			self.target_model = load_model(target_model_path)
 
 		#TODO: don't initialize dequeue if not training
 		if replay_memory == None:

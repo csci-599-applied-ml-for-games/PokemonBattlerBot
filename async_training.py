@@ -53,7 +53,7 @@ def start_game(bot1, bot1_password, bot1_team,
 if __name__ == '__main__':
 	random.seed()
 
-	TIMEOUT = 1200
+	TIMEOUT = 300
 	BOT_LIST = [('USCBot1', 'USCBot1', 'USCBot2', 'USCBot2'), 
 		('USCBot9', 'USCBot9', 'USCBot10', 'USCBot10')]
 
