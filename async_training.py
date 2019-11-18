@@ -174,5 +174,6 @@ if __name__ == '__main__':
 			agent.save_model(model_path)
 
 			#NOTE: check if we should move to the next epoch
+			#TODO: replace this with moving average win rate or something
 			if (iterations - min_epsilon_iterations) >= (0.5 * iterations):
 				break
