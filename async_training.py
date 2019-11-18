@@ -143,8 +143,6 @@ if __name__ == '__main__':
 				games_info[game_index].threads.append(bot1_thread)
 				games_info[game_index].threads.append(bot2_thread)
 
-			print('BOTS', games_info[game_index].bots)
-
 			#NOTE: wait until all games finish
 			any_alive = True
 			while any_alive:
@@ -208,4 +206,3 @@ if __name__ == '__main__':
 				#TODO: change me
 				if iteration == 500:
 					debug_log('Moving on to next adversarial network iteration')
-			break
