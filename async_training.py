@@ -205,7 +205,7 @@ if __name__ == '__main__':
 			#TODO: replace this loss check with moving average win rate or 
 			#TODO: something
 			if history != None:
-				pass
-			else:
-				debug_log('Moving on to next adversarial network iteration')
-				break
+				print(history.history)
+				#TODO: change me
+				if iteration == 500:
+					debug_log('Moving on to next adversarial network iteration')
