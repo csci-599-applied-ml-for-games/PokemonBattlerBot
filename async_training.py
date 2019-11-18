@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 import time
 from multiprocessing import Process
 from collections import deque
@@ -18,9 +19,13 @@ INPUT_SHAPE = (GameState.vector_dimension(),)
 
 MIN_REPLAY_MEMORY_SIZE = 3000
 
-def debug_print(*args):
+def debug_log(*args):
 	if DEBUG:
-		print(*args)
+		now = datetime.now()
+		l = [str(arg) for arg in args]
+		string = ' '.join(l)
+		with open(os.path.join(LOGS_DIR, 'async_train.log'), 'a') as fd:
+			fd.write(f'[{datetime.now()}] {string}\n')
 
 class GameInfo():
 	def __init__(self):
@@ -146,7 +151,7 @@ if __name__ == '__main__':
 							if process.is_alive():
 								any_alive = True
 
-			debug_print(f'on iteration {iteration}, replay_memory has size {len(replay_memory)}')
+			debug_log(f'on iteration {iteration}, replay_memory has size {len(replay_memory)}')
 
 			#NOTE: train
 			#NOTE: create/load DQN and target DQN in main thread
@@ -170,7 +175,7 @@ if __name__ == '__main__':
 			elif epsilon <= min_epsilon:
 				min_epsilon_iterations += 1
 
-			debug_print(f'epsilon is now {epsilon}')
+			debug_log(f'epsilon is now {epsilon}')
 
 			#NOTE: check if we should update target models
 			if target_update_counter > update_target_every:
@@ -190,5 +195,5 @@ if __name__ == '__main__':
 				((iteration - min_epsilon_iterations) >= (0.5 * iteration)) and
 				epsilon <= min_epsilon
 			):
-				debug_print('Moving on to next adversarial network iteration')
+				debug_log('Moving on to next adversarial network iteration')
 				break
