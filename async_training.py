@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 import time
-from multiprocessing import Process
+from multiprocessing import Process, Queue
 from collections import deque
 
 from keras.models import load_model
@@ -10,7 +10,7 @@ from dqn import DQNAgent, REPLAY_MEMORY_SIZE, create_model
 from gamestate import GameState
 from bot import RandomAgent, BotClient, RunType
 
-DEBUG = False
+DEBUG = True
 
 ASYNC_TRAIN_DIR = os.path.dirname(os.path.abspath(__file__))
 LOGS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
@@ -24,7 +24,7 @@ def debug_log(*args):
 		now = datetime.now()
 		l = [str(arg) for arg in args]
 		string = ' '.join(l)
-		with open(os.path.join(LOGS_DIR, 'async_train.log'), 'a') as fd:
+		with open(os.path.join(LOGS_DIR, 'async_train.txt'), 'a') as fd:
 			fd.write(f'[{datetime.now()}] {string}\n')
 
 class GameInfo():
@@ -33,9 +33,10 @@ class GameInfo():
 		self.processes = []
 		self.bots = []
 
-def make_bot(un, pw, expected_opponent, team, challenge, 
-	trainer, replay_memory, games_info, game_index, epsilon=None, 
-	model_path=None, target_model_path=None):
+def make_bot(un, pw, expected_opponent, team, challenge, trainer, games_info, 
+	game_index, epsilon=None, model_path=None, target_model_path=None, 
+	replay_queue=None
+):
 	
 	if trainer:
 		if model_path:
@@ -43,26 +44,29 @@ def make_bot(un, pw, expected_opponent, team, challenge,
 		else:
 			agent = RandomAgent()
 	else:
-		agent = DQNAgent(INPUT_SHAPE, epsilon=epsilon, random_moves=True, 
-			training=False, copy_target_model=False, 
-			replay_memory=replay_memory)
+		agent = DQNAgent(
+			INPUT_SHAPE, epsilon=epsilon, random_moves=True, training=False, 
+			copy_target_model=False
+		)
 		agent.load_model(model_path)
 		if target_model_path != None:
 			agent.target_model = load_model(target_model_path)
 		else:
 			agent.target_model.set_weights(agent.model.get_weights())
 
-	bot = BotClient(name=un, password=pw, 
-		expected_opponent=expected_opponent, team=team, 
+	bot = BotClient(
+		name=un, password=pw, expected_opponent=expected_opponent, team=team, 
 		challenge=challenge, runType=RunType.Iterations, runTypeData=1, 
-		agent=agent, trainer=trainer, save_model=False)
+		agent=agent, trainer=trainer, save_model=False, 
+		replay_queue=replay_queue
+	)
 	games_info[game_index].bots.append(bot)
 	bot.start()
 
 if __name__ == '__main__':
 	timeout = 1200
 	epsilon = 1
-	epsilon_decay = 0.99
+	epsilon_decay = 0.1
 	min_epsilon = 0.001
 	epochs = 1
 	games_to_play = 1
@@ -94,6 +98,8 @@ if __name__ == '__main__':
 		target_update_counter = 0
 
 		while True:
+			debug_log(f'Starting iteration {iteration}')
+			replay_queue = Queue()
 			#NOTE: start two processes for each game 
 			for game_index in range(games_to_play): 
 				#NOTE: get the account information
@@ -106,14 +112,14 @@ if __name__ == '__main__':
 				games_info[game_index].processes = []
 
 				bot1_process = Process(target=make_bot, 
-					args=(
-						un1, pw1, un2, team, False,  False, replay_memory, 
-						games_info, game_index
+					args=(un1, pw1, un2, team, False,  False, games_info, 
+						game_index
 					), 
 					kwargs={
 						'model_path': model_path, 
 						'target_model_path': target_model_path,
-						'epsilon': epsilon
+						'epsilon': epsilon,
+						'replay_queue': replay_queue
 					}, 
 					daemon=True)
 				bot1_process.start()
@@ -125,9 +131,8 @@ if __name__ == '__main__':
 				else:
 					trainer_model_path = original_model_path
 				bot2_process = Process(target=make_bot, 
-					args=(
-						un2, pw2, un1, team, True, True, replay_memory, 
-						games_info, game_index
+					args=(un2, pw2, un1, team, True, True, games_info, 
+						game_index
 					),
 					kwargs={'model_path': trainer_model_path}, 
 					daemon=True) #TODO: add the model_path
@@ -147,22 +152,26 @@ if __name__ == '__main__':
 						for bot in game_info.bots:
 							bot.kill() 
 					else:
-						for process in game_info.processes:
-							if process.is_alive():
+						for process, bot in zip(game_info.processes, game_info.bots):
+							if process.is_alive() and not bot.done:
 								any_alive = True
-
-			debug_log(f'on iteration {iteration}, replay_memory has size {len(replay_memory)}')
 
 			#NOTE: train
 			#NOTE: create/load DQN and target DQN in main thread
-			agent = DQNAgent(
-				INPUT_SHAPE, training=True, replay_memory=replay_memory, 
-				copy_target_model=False
+			while not replay_queue.empty():
+				transition = replay_queue.get()
+				replay_memory.append(transition)
+
+			debug_log(f'on iteration {iteration}, replay_memory has size {len(replay_memory)}')
+
+			agent = DQNAgent(INPUT_SHAPE, training=True, 
+				replay_memory=replay_memory, copy_target_model=False
 			)
 			agent.target_model = load_model(target_model_path)
 			#NOTE: train newly loaded model
-			history = agent.train_only(MIN_REPLAY_MEMORY_SIZE, MIN_REPLAY_MEMORY_SIZE)
-			#TODO: get the actual history from the agent. seems to only return a boolean for some reason
+			history = agent.train_only(MIN_REPLAY_MEMORY_SIZE, 
+				MIN_REPLAY_MEMORY_SIZE
+			)
 
 			#NOTE: decay epsilon
 			if epsilon > min_epsilon:
@@ -186,14 +195,17 @@ if __name__ == '__main__':
 
 			#NOTE: update model_path
 			iteration += 1
-			model_path = os.path.join(LOGS_DIR, f'Epoch{epoch}_Iteration{iteration}.model')
+			model_path = os.path.join(
+				LOGS_DIR, 
+				f'Epoch{epoch}_Iteration{iteration}.model'
+			)
 			agent.save_model(model_path)
 
 			#NOTE: check if we should move to the next epoch
-			#TODO: replace this with moving average win rate or something
-			if (
-				((iteration - min_epsilon_iterations) >= (0.5 * iteration)) and
-				epsilon <= min_epsilon
-			):
+			#TODO: replace this loss check with moving average win rate or 
+			#TODO: something
+			if history != None:
+				pass
+			else:
 				debug_log('Moving on to next adversarial network iteration')
 				break

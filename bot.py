@@ -137,7 +137,11 @@ class BotClient(showdown.Client):
 	def __init__(self, name='', password='', loop=None, max_room_logs=5000,
 		server_id='showdown', server_host=None, expected_opponent=None,
 		team=None, challenge=False, runType=RunType.Iterations, runTypeData=1,
-		agent=None, print_stats=False, trainer=False, save_model=True):
+		agent=None, print_stats=False, trainer=False, save_model=True, 
+		replay_queue=None
+	):
+		self.done = False
+		self.replay_queue = replay_queue
 
 		if expected_opponent == None:
 			raise Exception("No expected opponent found in arguments")
@@ -349,6 +353,11 @@ class BotClient(showdown.Client):
 		self.log('ERROR')
 		self.log(''.join(traceback.format_tb(err.__traceback__)))
 
+	def update_replay_memory(self, transition):
+		self.agent.update_replay_memory(transition)
+		if self.replay_queue != None:
+			self.replay_queue.put(transition)
+
 	async def on_receive(self, room_id, inp_type, params):
 		try:
 			self.log(f'Input type: {inp_type}')
@@ -462,7 +471,7 @@ class BotClient(showdown.Client):
 							reward, 
 							self.state_vl, 
 							done)
-						self.agent.update_replay_memory(transition)
+						self.update_replay_memory(transition)
 						self.agent.train(False)
 					self.log(f'This transition\'s reward was {reward}')
 					
@@ -661,9 +670,7 @@ class BotClient(showdown.Client):
 						reward, 
 						self.state_vl, 
 						done)
-					self.log(f'Updating replay memory with {transition}')
-					self.agent.update_replay_memory(transition)
-					self.log(f'Successfully updated replay memory')
+					self.update_replay_memory(transition)
 					trained = self.agent.train(True)
 					if trained and self.save_model:
 						self.log(f'Trained')
@@ -694,6 +701,7 @@ class BotClient(showdown.Client):
 							win_ratio = (float(self.wins) / 
 								float(self.wins + self.losses))
 							print(f'Win ratio: {win_ratio}')
+						self.done = True
 						sys.exit(0)
 
 				elif inp_type == '-ability':
