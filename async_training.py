@@ -160,10 +160,12 @@ if __name__ == '__main__':
 			#TODO: get the actual history from the agent. seems to only return a boolean for some reason
 
 			#NOTE: decay epsilon
-			if epsilon > min_epsilon and len(replay_memory) > MIN_REPLAY_MEMORY_SIZE:
-				epsilon *= epsilon_decay
-				if epsilon < min_epsilon:
-					epsilon = min_epsilon
+			if epsilon > min_epsilon:
+				if len(replay_memory) > MIN_REPLAY_MEMORY_SIZE:
+					epsilon *= epsilon_decay
+					if epsilon < min_epsilon:
+						epsilon = min_epsilon
+				else:
 					min_epsilon_iterations = 0
 			elif epsilon <= min_epsilon:
 				min_epsilon_iterations += 1
@@ -184,6 +186,9 @@ if __name__ == '__main__':
 
 			#NOTE: check if we should move to the next epoch
 			#TODO: replace this with moving average win rate or something
-			if (iteration - min_epsilon_iterations) >= (0.5 * iteration):
+			if (
+				((iteration - min_epsilon_iterations) >= (0.5 * iteration)) and
+				epsilon <= min_epsilon
+			):
 				debug_print('Moving on to next adversarial network iteration')
 				break
