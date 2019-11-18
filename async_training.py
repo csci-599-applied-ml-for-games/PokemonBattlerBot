@@ -9,12 +9,18 @@ from dqn import DQNAgent, REPLAY_MEMORY_SIZE, create_model
 from gamestate import GameState
 from bot import RandomAgent, BotClient, RunType
 
+DEBUG = False
+
 ASYNC_TRAIN_DIR = os.path.dirname(os.path.abspath(__file__))
 LOGS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
 
 INPUT_SHAPE = (GameState.vector_dimension(),)
 
 MIN_REPLAY_MEMORY_SIZE = 3000
+
+def debug_print(*args):
+	if DEBUG:
+		print(*args)
 
 class GameInfo():
 	def __init__(self):
@@ -140,6 +146,8 @@ if __name__ == '__main__':
 							if process.is_alive():
 								any_alive = True
 
+			debug_print(f'on iteration {iteration}, replay_memory has size {len(replay_memory)}')
+
 			#NOTE: train
 			#NOTE: create/load DQN and target DQN in main thread
 			agent = DQNAgent(
@@ -160,6 +168,7 @@ if __name__ == '__main__':
 			elif epsilon <= min_epsilon:
 				min_epsilon_iterations += 1
 
+			debug_print(f'epsilon is now {epsilon}')
 
 			#NOTE: check if we should update target models
 			if target_update_counter > update_target_every:
@@ -175,5 +184,6 @@ if __name__ == '__main__':
 
 			#NOTE: check if we should move to the next epoch
 			#TODO: replace this with moving average win rate or something
-			if (iterations - min_epsilon_iterations) >= (0.5 * iterations):
+			if (iteration - min_epsilon_iterations) >= (0.5 * iteration):
+				debug_print('Moving on to next adversarial network iteration')
 				break
