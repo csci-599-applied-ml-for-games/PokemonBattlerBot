@@ -159,6 +159,17 @@ class BotClient(showdown.Client):
 		self.challenge = challenge
 		self.has_challenged = False
 
+		# flag used to detect the first 'request' inp_type
+		# first request is used to initialize moves for gamestate
+		# Rreset to false for every battle
+		self.is_first_request = True
+
+		# Keep a track of zmoves used, as each pokemon can use z moves only once
+		# per battle, we update each zmove here used per battle so it can't be used
+		# again. Reset to empty list after battle ends
+		# type: [{pokemon_name : zmove}]
+		self.zmoves_tracker = []
+
 		self.wins = 0
 		self.losses = 0
 		self.print_stats = print_stats
@@ -201,11 +212,11 @@ class BotClient(showdown.Client):
 		replays_dir = os.path.join(BOT_DIR, 'replays')
 		if not os.path.exists(replays_dir):
 			os.mkdir(replays_dir)
-		
 		replay_file = f'{self.datestring}_Iteration{self.iterations_run}.html'
-		with open(os.path.join(replays_dir, replay_file), 'wt') as f:
+		with open(os.path.join(replays_dir, replay_file), 'wb') as f:
 			f.write(util.get_replay_header())
-			f.write('\n'.join(room_obj.logs))
+			joined = '\n'.join(room_obj.logs)
+			f.write('\n'.join(room_obj.logs).encode('utf-8'))
 			f.write(util.get_replay_footer())
 	
 	@staticmethod
@@ -217,13 +228,30 @@ class BotClient(showdown.Client):
 		return data['active']
 
 	async def switch_pokemon(self, room_obj, data):
+		'''
+		For use with forceswitch scenarios
+		'''
+		valid_actions = []
 		team_info = self.get_team_info(data)
-		switch_available = []
 		for pokemon_index, pokemon_info in enumerate(team_info):
-			if 'fnt' not in pokemon_info['condition']:
-				switch_available.append(pokemon_index + 1)
-		switch_index = random.choice(switch_available)
-		await room_obj.switch(switch_index)
+			fainted = 'fnt' in pokemon_info.get('condition')
+			if (not pokemon_info.get('active', False) and 
+				not fainted):
+
+				pokemon_name = self.gs.pokemon_name_clean(pokemon_info['details'])
+				valid_actions.append((pokemon_index + 1 , 
+					pokemon_name, 
+					ActionType.Switch))
+		
+		self.log(f'valid_actions: {valid_actions}')
+
+		action_index, action_string, action_type, _ = \
+			self.agent.get_action(self.gs.vector_list, valid_actions)
+
+		if action_type == ActionType.Switch:
+			await room_obj.switch(action_index)
+		else:
+			self.log(f'Unexpected action type {action_type}')
 
 	async def take_action(self, room_obj, data):
 		self.log(f'data: {data}')
@@ -231,7 +259,7 @@ class BotClient(showdown.Client):
 		self.log(f'Moves: {moves}')
 		valid_actions = []
 		for move_index, move_data in enumerate(moves):
-			if ((move_data.get('pp', 0) > 0 and not move_data.get('disabled'))
+			if (( move_data.get('pp', 0) > 0 and not move_data.get('disabled'))
 				or move_data.get('move') == 'Struggle'):
 				
 				valid_actions.append((move_index + 1, 
@@ -244,9 +272,8 @@ class BotClient(showdown.Client):
 			fainted = 'fnt' in pokemon_info.get('condition')
 			if (not pokemon_info.get('active', False) and 
 				not fainted):
-				self.log('cleaning name')
+
 				pokemon_name = self.gs.pokemon_name_clean(pokemon_info['details'])
-				self.log('appending')
 				valid_actions.append((pokemon_index + 1 , 
 					pokemon_name, 
 					ActionType.Switch))
@@ -310,6 +337,7 @@ class BotClient(showdown.Client):
 
 		room_obj = self.rooms.get(room_id)
 		if room_obj and room_obj.id.startswith('battle-'):
+			
 			if inp_type == 'poke':
 				owner = params[0]
 				pokename = GameState.pokemon_name_clean(params[1])
@@ -331,10 +359,25 @@ class BotClient(showdown.Client):
 					self.gs.init_health(GameState.Player.one)
 					self.gs.init_health(GameState.Player.two)
 
-					#NOTE: Select starting pokemon here 
-					start_index = random.randint(1, self.teamsize)
-					await room_obj.start_poke(start_index)
+					self.gs.reset_boosts(GameState.Player.one)
+					self.gs.reset_boosts(GameState.Player.two)
 
+					#NOTE: Select starting pokemon here 
+					valid_actions = []
+					for pokemon_index, pokemon_name in enumerate(self.team):
+						pokemon_name = self.gs.pokemon_name_clean(pokemon_name)
+						valid_actions.append((pokemon_index + 1 , 
+							pokemon_name, 
+							ActionType.Switch))
+					
+					action_index, action_string, action_type, _ = \
+						self.agent.get_action(self.gs.vector_list, valid_actions)
+
+					if action_type == ActionType.Switch:
+						await room_obj.start_poke(action_index)
+					else:
+						self.log(f'Unexpected action type {action_type}') 
+					
 			elif inp_type == 'teamsize':
 				position = params[0]
 				if position == self.position:
@@ -353,6 +396,11 @@ class BotClient(showdown.Client):
 			elif inp_type == 'turn':
 				self.turn_number = int(params[0])
 				
+				self.log(f'Weather: {self.gs.all_weather()}')
+
+				self.log(f'P1 Boosts: {self.gs.all_boosts(GameState.Player.one)}')
+				self.log(f'P2 Boosts: {self.gs.all_boosts(GameState.Player.two)}')
+
 				active_pokemon = self.gs.all_active(GameState.Player.one)
 				self.log(f'P1 active: {active_pokemon}')
 				if len(active_pokemon) > 1:
@@ -369,8 +417,14 @@ class BotClient(showdown.Client):
 				self.log(f'P1 fainted: {self.gs.all_fainted(GameState.Player.one)}')
 				self.log(f'P2 fainted: {self.gs.all_fainted(GameState.Player.two)}')
 
+				self.log(f'P1 types: {self.gs.all_types(GameState.Player.one)}')
+				self.log(f'P2 types: {self.gs.all_types(GameState.Player.two)}')
+
 				self.log(f'P1 statuses: {self.gs.all_statuses(GameState.Player.one)}')
 				self.log(f'P2 statuses: {self.gs.all_statuses(GameState.Player.two)}')
+
+				self.log(f'P1 moves: {self.gs.all_moves(GameState.Player.one)}')
+				self.log(f'P2 moves: {self.gs.all_moves(GameState.Player.two)}')
 
 				if self.turn_number == 1:
 					self.state_vl = self.gs.vector_list
@@ -390,78 +444,72 @@ class BotClient(showdown.Client):
 					self.agent.update_replay_memory(transition)
 					self.agent.train(False)
 				self.log(f'This transition\'s reward was {reward}')
+				
 			elif inp_type == 'request':
 				json_string = params[0]
 				data = json.loads(json_string)
-				self.last_request_data = data
 				team_info = self.get_team_info(data)
-				self.team_abilities = {}
-				self.team_items = {}
-				self.team_moves = {}
+				self.last_request_data = data
+
+				# Initialize all available pokemon moves for game stats
+				if self.is_first_request:
+					for pokemon_info in team_info:
+						pokemon_name = GameState.pokemon_name_clean(pokemon_info['details'])						
+						for move_name in pokemon_info['moves']:
+							# Initially PP = Max PP, so pseudo PP, Max PP values to set move
+							# as PP, Max PP are available for only active Pokemons
+							self.gs.set_move(GameState.Player.one, pokemon_name, move_name, 1.0, 1.0)	
+												
+					self.is_first_request = False
+					
+				# Update PP for the active pokemon only
+				else:
+					for pokemon_info in team_info:
+						pokemon_name = GameState.pokemon_name_clean(pokemon_info['details'])		
+						if pokemon_info['active'] == True:
+							if 'active' in data:
+								moves = data['active'][0]['moves']
+								for move in moves:
+									self.gs.set_move(GameState.Player.one, pokemon_name, move['id'],
+										move['pp'], move['maxpp'])
+								
+								if 'canZMove' in data['active'][0]:
+									if pokemon_name not in self.zmoves_tracker:
+										zmove_id = util.move_name_to_id(data['active'][0]['canZMove'][1]['move'])
+										self.gs.set_move(GameState.Player.one, pokemon_name, zmove_id, 1.0, 1.0)
+
+				# Update pokemon stat and items for game state
 				for pokemon_info in team_info:
-					self.log('info', pokemon_info)
-					pokemon_name = GameState.pokemon_name_clean(pokemon_info['details'])
-					# get the ability for each pokemon
-					self.team_abilities[pokemon_name] = pokemon_info['ability']
-					# track the items each pokemon
-					self.team_items[pokemon_name] = pokemon_info['item']
-					# track the team movelist?
-					self.team_moves[pokemon_name] = pokemon_info['moves']
-					# if pokemon_info.get('active'):
-						# self.active_pokemon = pokemon_info['details'].rstrip(', M').rstrip(', F')
-						# self.log('active_pokemon', self.active_pokemon)
-						# self.log('active_pokemon types', TYPE_MAP.get(self.active_pokemon))
-						#break // removed this line so it would get all the moves and stuff and things ya know
-				self.log('team abilities', self.team_abilities)
-				self.log('team items', self.team_items)
-				self.log('team moves', self.team_moves)	
+					pokemon_name = GameState.pokemon_name_clean(pokemon_info['details'])		
+					stats = pokemon_info['stats']
+					for stat_name in stats:
+						self.gs.set_stat(GameState.Player.one, pokemon_name, stat_name, stats[stat_name])
+
+					item = pokemon_info['item']
+					# If item key has empty string if no item possesed by Pokemon,
+					# item could have been knocked out or used my Pokemon
+					if item == '':
+						self.gs.clear_all_items(GameState.Player.one, pokemon_name)
+					
+					# Else update item with the current item even if there is no change
+					# clear old item and set new item as a Pokemon can possess only an item at a time
+					else:
+						self.gs.clear_all_items(GameState.Player.one, pokemon_name)
+						self.gs.set_item(GameState.Player.one, pokemon_name, item)	
+
 				force_switch = data.get('forceSwitch', [False])[0]
 				if force_switch == True:
-					# switch_available = []
-					# for pokemon_index, pokemon_info in enumerate(team_info):
-					# 	if 'fnt' not in pokemon_info['condition']:
-					# 		switch_available.append(pokemon_index + 1)
-					# switch_index = random.choice(switch_available)
-					# await room_obj.switch(switch_index)
-
 					await self.switch_pokemon(room_obj, data)
+
 				else:
 					await self.take_action(room_obj, data)
 			
 			elif inp_type == '-status':
-				'''
-				NOTE: statuses
-				brn
-				par
-				slp
-				frz
-				psn
-				tox
-				confusion
-				flinch
-				trapped
-				trapper
-				partiallytrapped
-				lockedmove
-				twoturnmove
-				choicelock
-				mustrecharge
-				futuremove
-				healreplacement
-				stall
-				gem
-				raindance
-				primordialsea
-				sunnyday
-				desolateland
-				sandstorm
-				hail
-				deltastream
-				arceus
-				silvally
-				'''
 				pokemon_data = params[0]
 				pokemon_name = self.get_pokemon(pokemon_data)
+				#TODO: remove this hack and have a good way of handling
+				#TODO: detailed vs. non-detailed pokemon names
+				pokemon_name = hack_name(pokemon_name)
 				status = params[1]
 				if self.own_pokemon(pokemon_data):
 					self.add_status(GameState.Player.one, pokemon_name, status)
@@ -515,6 +563,9 @@ class BotClient(showdown.Client):
 				else:
 					pokemon_name = self.opp_active_pokemon
 					gs_player = GameState.Player.two
+
+				self.gs.reset_boosts(gs_player)
+				
 				if pokemon_name != None:
 					for volatile_status in volatile_statuses:
 						self.remove_status(gs_player, pokemon_name, 
@@ -542,36 +593,23 @@ class BotClient(showdown.Client):
 						self.log(f'WARNING: {self.active_pokemon}'
 							' was not active as expected')
 
-			elif inp_type == 'weather':
-				self.weather = params[0]
-				self.log('New weather: {}'.format(self.weather))
-
 			elif inp_type == '-sidestart':
 				position = params[0].split(':')[0]
 				hazard = params[1].lstrip('move: ')
 				if position.startswith(self.position):
-					self.sidestart.append(hazard)
-				else:
-					self.opp_sidestart.append(hazard)
+					self.gs.increment_entry_hazard(GameState.Player.one, hazard)
 
-				self.log('Self sidestart', self.sidestart)
-				self.log('Opp sidestart', self.opp_sidestart)
+				else:
+					self.gs.increment_entry_hazard(GameState.Player.two, hazard)
 
 			elif inp_type == '-sideend':
 				position = params[0].split(':')[0]
+				hazard = params[1]
 				if position.startswith(self.position):
-					try:
-						self.sidestart.remove(params[1])
-					except ValueError:
-						pass
+					self.gs.clear_entry_hazard(GameState.Player.one, hazard)
+				
 				else:
-					try:
-						self.opp_sidestart.remove(params[1])
-					except ValueError:
-						pass
-
-				self.log('Self sidestart', self.sidestart)
-				self.log('Opp sidestart', self.opp_sidestart)
+					self.gs.clear_entry_hazard(GameState.Player.two, hazard)
 
 			elif inp_type == 'error':
 				self.save_replay(room_obj)
@@ -584,8 +622,6 @@ class BotClient(showdown.Client):
 						await self.take_action(room_obj, self.last_request_data)
 
 			elif inp_type == 'win':
-				
-				self.save_replay(room_obj)
 				done = True
 				
 				winner = params[0]
@@ -623,12 +659,13 @@ class BotClient(showdown.Client):
 						self.agent.restart_epoch()
 				else:
 					self.log(f'Not trained')
-					
+				
 				await room_obj.leave()
 				self.iterations_run += 1
 				self.update_log_paths()
-				
 				if self.should_play_new_game():
+					self.is_first_request = True
+					self.zmoves_tracker = []
 					self.log("Starting iteration {}".format(self.iterations_run))
 					if self.challenge:
 						time.sleep(5)
@@ -725,36 +762,97 @@ class BotClient(showdown.Client):
 					# AI uses mega
 					self.mega = True
 
+
 			elif inp_type == '-item':
-				# how do we use items I don't get it...
-				self.log('item')
-				#self.log(params)
+				'''
+				-item|POKEMON|ITEM
+				The ITEM held by the POKEMON has been changed or revealed due to a move or ability. 
+				In addition, Air Balloon reveals itself when the Pokémon holding it switches in, so it will also cause this message to appear.
+				'''
+				position = self.get_owner(params)
+				pokemon_name = self.get_pokemon(params)
+				item = util.item_name_to_id(params[1])
+				if position.startswith(self.position):
+					self.gs.set_item(GameState.Player.one, pokemon_name, item)
+				
+				else:
+					self.gs.set_item(GameState.Player.two, pokemon_name, item)
+
+
+			elif inp_type == '-enditem':
+				'''
+				-enditem|POKEMON|ITEM
+				The ITEM held by POKEMON has been destroyed, and it now holds no item. 
+				This can be because of an item's own effects (consumed Berries, Air Balloon), or by a move or ability, like Knock Off. 
+				If a berry is consumed, it also has an additional modifier |[eat] to indicate that it was consumed. 
+				This message does not appear if the item's ownership was changed (with a move or ability like Thief or Trick), 
+				even if the move or ability would result in a Pokémon without an item.
+
+				Note:
+					Kept for legacy and inclusiveness reasons
+					Actual tracking of this hook done based on changed
+					Item in 'request' inp_type
+				'''
+				pass
+
 
 			elif inp_type == 'move':
-				if ('p1a' in str(params[0])):
-					# player 1 active pokemon used move.
-					pokemon = params[0].strip('p1a: ')
-					# self.enemy_state.update_moves_list(pokemon, params[1])
-					self.log('P1 used: ', params[1])
-					self.log('Enemy Moves State:', self.enemy_state.team_moves)
-				else:
-					# player 2 pokemon used move.
-					my_move = params[1]
-					self.log('P2 used: ', my_move)
+				'''
+				move|POKEMON|MOVE|TARGET
+				The specified Pokémon has used move MOVE at TARGET. 
+				If a move has multiple targets or no target, TARGET should be ignored. 
+				If a move targets a side, TARGET will be a (possibly fainted) Pokémon on that side.
+				If |[miss] is present, the move missed.
+				'''
+				if len(params) == 4:
+					if params[3] == '[zeffect]':
+						if self.get_owner(params[0]) == 'p1a':
+							pokemon_name = self.get_pokemon(params[0])
+							zmove_id = util.move_name_to_id(params[1])
+							# Add (pokemon : zmove) in the zmove_tracker to
+							# ensure, this pokemon can't re-use zmove
+							self.zmoves_tracker[pokemon_name] = zmove_name
+							self.gs.set_move(GameState.Player.one, pokemon_name, zmove_id, 0.0, 1.0)
 
 			elif inp_type == '-zpower':
-				if ('p1a' in str(params[0])):
-					# opposing player used Z Power
-					pokemon = params[0].strip('p1a: ')
-					# self.enemy_state.update_used_zpower(pokemon)
-					self.opp_zpower = True
-				else:
-					# Add which pokemon used the zpower obviously but should discuss data structure 
-					# and design of objects first.
-					self.z_power = True
+				'''
+				|-zpower|POKEMON
+				The Pokémon POKEMON has used the z-move version of its move.
+
+				Note:
+					Kept for legacy and inclusiveness reasons
+					Actual tracking of zpower done in the '-move'
+					hook
+				'''
+				pass
 
 			elif inp_type == '-weather':
-				self.log('weather', params)
+				weather_name = params[0]
+				if weather_name == 'none':
+					self.gs.clear_all_weather()
+				else:
+					self.gs.set_weather(weather_name)
+
+			elif inp_type == '-boost':
+				mine = params[0].startswith(self.position)
+				if mine:
+					gs_player = GameState.Player.one
+				else:
+					gs_player = GameState.Player.two
+				boost_name = params[1]
+				stages = float(params[2])
+				self.gs.add_boost(gs_player, boost_name, stages)
+
+			elif inp_type == '-unboost':
+				mine = params[0].startswith(self.position)
+				if mine:
+					gs_player = GameState.Player.one
+				else:
+					gs_player = GameState.Player.two
+				boost_name = params[1]
+				stages = float(params[2])
+				self.gs.add_boost(gs_player, boost_name, -1 * stages)
+
 		else:
 			if inp_type == 'updateuser':
 				if (self.name == params[0].strip() and self.challenge and 
@@ -789,11 +887,7 @@ class BotClient(showdown.Client):
 		if room_obj.id.startswith('battle-'):
 			self.log(f'Room ID: {room_obj.id}')
 			self.active_pokemon = None
-			self.sidestart = []
-
 			self.opp_active_pokemon = None
-			self.opp_sidestart = []
-
 			self.weather = 'none'
 
 def main():
