@@ -66,7 +66,7 @@ def make_bot(un, pw, expected_opponent, team, challenge, trainer, games_info,
 if __name__ == '__main__':
 	timeout = 1200
 	epsilon = 1
-	epsilon_decay = 0.1
+	epsilon_decay = 0.99
 	min_epsilon = 0.001
 	epochs = 1
 	games_to_play = 1
