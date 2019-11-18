@@ -356,6 +356,7 @@ class BotClient(showdown.Client):
 	def update_replay_memory(self, transition):
 		self.agent.update_replay_memory(transition)
 		if self.replay_queue != None:
+			self.log('updating replay_queue')
 			self.replay_queue.put(transition)
 
 	async def on_receive(self, room_id, inp_type, params):

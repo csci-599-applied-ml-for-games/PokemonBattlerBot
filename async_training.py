@@ -142,6 +142,8 @@ if __name__ == '__main__':
 				games_info[game_index].processes.append(bot1_process)
 				games_info[game_index].processes.append(bot2_process)
 
+			print(games_info[game_index].bots)
+			time.sleep(5)
 			#NOTE: wait until all games finish
 			any_alive = True
 			while any_alive:
@@ -153,8 +155,9 @@ if __name__ == '__main__':
 							bot.kill() 
 					else:
 						for process, bot in zip(game_info.processes, game_info.bots):
-							if process.is_alive() and not bot.done:
+							if not bot.done:
 								any_alive = True
+			print('???')
 
 			#NOTE: train
 			#NOTE: create/load DQN and target DQN in main thread
@@ -209,3 +212,4 @@ if __name__ == '__main__':
 				#TODO: change me
 				if iteration == 500:
 					debug_log('Moving on to next adversarial network iteration')
+			break
