@@ -149,6 +149,7 @@ if __name__ == '__main__':
 			agent.target_model = load_model(target_model_path)
 			#NOTE: train newly loaded model
 			history = agent.train_only(MIN_REPLAY_MEMORY_SIZE, MIN_REPLAY_MEMORY_SIZE)
+			#TODO: get the actual history from the agent. seems to only return a boolean for some reason
 
 			#NOTE: decay epsilon
 			if epsilon > min_epsilon and len(replay_memory) > MIN_REPLAY_MEMORY_SIZE:
@@ -173,6 +174,5 @@ if __name__ == '__main__':
 			agent.save_model(model_path)
 
 			#NOTE: check if we should move to the next epoch
-			#TODO: implement checking for next epoch
-			# print(history.history.keys())
-			break
+			if (iterations - min_epsilon_iterations) >= (0.5 * iterations):
+				break
