@@ -138,10 +138,8 @@ class BotClient(showdown.Client):
 		server_id='showdown', server_host=None, expected_opponent=None,
 		team=None, challenge=False, runType=RunType.Iterations, runTypeData=1,
 		agent=None, print_stats=False, trainer=False, save_model=True, 
-		replay_queue=None
 	):
 		self.done = False
-		self.replay_queue = replay_queue
 
 		if expected_opponent == None:
 			raise Exception("No expected opponent found in arguments")
@@ -355,9 +353,6 @@ class BotClient(showdown.Client):
 
 	def update_replay_memory(self, transition):
 		self.agent.update_replay_memory(transition)
-		if self.replay_queue != None:
-			self.log('updating replay_queue')
-			self.replay_queue.put(transition)
 
 	async def on_receive(self, room_id, inp_type, params):
 		try:
@@ -921,6 +916,7 @@ class BotClient(showdown.Client):
 			self.weather = 'none'
 
 	def kill(self):
+		self.done = True
 		sys.exit(0)
 
 

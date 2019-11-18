@@ -1,8 +1,9 @@
 import os
 from datetime import datetime
 import time
-from multiprocessing import Process, Queue
+from threading import Thread
 from collections import deque
+import asyncio
 
 from keras.models import load_model
 
@@ -30,14 +31,14 @@ def debug_log(*args):
 class GameInfo():
 	def __init__(self):
 		self.start_time = 0.0
-		self.processes = []
+		self.threads = []
 		self.bots = []
 
 def make_bot(un, pw, expected_opponent, team, challenge, trainer, games_info, 
-	game_index, epsilon=None, model_path=None, target_model_path=None, 
-	replay_queue=None
+	game_index, loop, epsilon=None, model_path=None, target_model_path=None, 
+	replay_memory=None
 ):
-	
+	asyncio.set_event_loop(loop)
 	if trainer:
 		if model_path:
 			agent = DQNAgent(INPUT_SHAPE, training=False)
@@ -46,7 +47,7 @@ def make_bot(un, pw, expected_opponent, team, challenge, trainer, games_info,
 	else:
 		agent = DQNAgent(
 			INPUT_SHAPE, epsilon=epsilon, random_moves=True, training=False, 
-			copy_target_model=False
+			copy_target_model=False, replay_memory=replay_memory
 		)
 		agent.load_model(model_path)
 		if target_model_path != None:
@@ -57,8 +58,7 @@ def make_bot(un, pw, expected_opponent, team, challenge, trainer, games_info,
 	bot = BotClient(
 		name=un, password=pw, expected_opponent=expected_opponent, team=team, 
 		challenge=challenge, runType=RunType.Iterations, runTypeData=1, 
-		agent=agent, trainer=trainer, save_model=False, 
-		replay_queue=replay_queue
+		agent=agent, trainer=trainer, save_model=False
 	)
 	games_info[game_index].bots.append(bot)
 	bot.start()
@@ -99,8 +99,7 @@ if __name__ == '__main__':
 
 		while True:
 			debug_log(f'Starting iteration {iteration}')
-			replay_queue = Queue()
-			#NOTE: start two processes for each game 
+			#NOTE: start two threads for each game 
 			for game_index in range(games_to_play): 
 				#NOTE: get the account information
 				account1 = accounts[2 * game_index]
@@ -109,20 +108,21 @@ if __name__ == '__main__':
 				un2, pw2 = account2
 				
 				games_info[game_index].bots = []
-				games_info[game_index].processes = []
+				games_info[game_index].threads = []
 
-				bot1_process = Process(target=make_bot, 
+				loop1 = asyncio.new_event_loop()
+				bot1_thread = Thread(target=make_bot, 
 					args=(un1, pw1, un2, team, False,  False, games_info, 
-						game_index
+						game_index, loop1
 					), 
 					kwargs={
 						'model_path': model_path, 
 						'target_model_path': target_model_path,
 						'epsilon': epsilon,
-						'replay_queue': replay_queue
+						'replay_memory': replay_memory
 					}, 
 					daemon=True)
-				bot1_process.start()
+				bot1_thread.start()
 
 				time.sleep(5) #NOTE: the challenger needs to come a little after the other bot is set up
 
@@ -130,20 +130,21 @@ if __name__ == '__main__':
 					trainer_model_path = None
 				else:
 					trainer_model_path = original_model_path
-				bot2_process = Process(target=make_bot, 
+				loop2 = asyncio.new_event_loop()
+				bot2_thread = Thread(target=make_bot, 
 					args=(un2, pw2, un1, team, True, True, games_info, 
-						game_index
+						game_index, loop2
 					),
 					kwargs={'model_path': trainer_model_path}, 
 					daemon=True) #TODO: add the model_path
-				bot2_process.start()
+				bot2_thread.start()
 
 				games_info[game_index].start_time = time.time()
-				games_info[game_index].processes.append(bot1_process)
-				games_info[game_index].processes.append(bot2_process)
+				games_info[game_index].threads.append(bot1_thread)
+				games_info[game_index].threads.append(bot2_thread)
 
-			print(games_info[game_index].bots)
-			time.sleep(5)
+			print('BOTS', games_info[game_index].bots)
+
 			#NOTE: wait until all games finish
 			any_alive = True
 			while any_alive:
@@ -154,17 +155,12 @@ if __name__ == '__main__':
 						for bot in game_info.bots:
 							bot.kill() 
 					else:
-						for process, bot in zip(game_info.processes, game_info.bots):
-							if not bot.done:
+						for thread in game_info.threads:
+							if thread.is_alive():
 								any_alive = True
-			print('???')
 
 			#NOTE: train
 			#NOTE: create/load DQN and target DQN in main thread
-			while not replay_queue.empty():
-				transition = replay_queue.get()
-				replay_memory.append(transition)
-
 			debug_log(f'on iteration {iteration}, replay_memory has size {len(replay_memory)}')
 
 			agent = DQNAgent(INPUT_SHAPE, training=True, 
