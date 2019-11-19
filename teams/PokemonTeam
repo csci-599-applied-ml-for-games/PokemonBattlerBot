@@ -8,13 +8,14 @@ IVs: 0 Spe
 - Scald  
 - Roost  
 
-Greninja-Ash (M) @ Choice Specs  
-Ability: Battle Bond  
+Greninja @ Choice Specs  
+Ability: Torrent  
 EVs: 252 SpA / 4 SpD / 252 Spe  
 Timid Nature  
-- Hydro Pump  
+IVs: 0 Atk  
 - Dark Pulse  
 - Water Shuriken  
+- Hydro Pump  
 - Ice Beam  
 
 Swampert-Mega @ Swampertite  
@@ -53,4 +54,3 @@ Timid Nature
 - Knock Off  
 - U-turn  
 - Defog  
-

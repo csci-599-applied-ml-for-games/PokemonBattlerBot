@@ -19,7 +19,7 @@ from keras.optimizers import Adam
 
 LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
 
-DISCOUNT = 0.99
+DISCOUNT = 0.85
 REPLAY_MEMORY_SIZE = 50_000
 MIN_REPLAY_MEMORY_SIZE = 1000
 MINIBATCH_SIZE = 64
@@ -28,9 +28,10 @@ class ActionType(Enum):
 	Move = auto()
 	Switch = auto()
 
-#5 pokemon to switch to, 4 moves for active pokemon
 #TODO: handle mega
-MAX_ACTION_SPACE_SIZE = 9
+MAX_ACTION_SPACE_SIZE = (MOVE_NAME_TO_INDEX['Count'] + 
+	POKEMON_NAME_TO_INDEX['Count'])
+
 class DQNAgent():
 	def __init__(self, input_shape, log_path=None, replay_memory_path=None, 
 		model_path=None, training=True, epsilon_decay=0.99):
@@ -65,8 +66,8 @@ class DQNAgent():
 	def create_model(self):
 		model = Sequential()
 
-		#NOTE: the current unit count (64) is chosen somewhat arbitrarily
-		model.add(Dense(64, input_shape=self.input_shape)) 
+		model.add(Dense(128, input_shape=self.input_shape)) 
+		model.add(Dense(128, activation='relu')) 
 		model.add(Dense(MAX_ACTION_SPACE_SIZE, activation='linear'))
 		model.compile(loss='mse', optimizer=Adam(lr=0.001), 
 			metrics=['accuracy'])
@@ -88,48 +89,56 @@ class DQNAgent():
 			self.log(f'Epsilon is now {self.epsilon}')
 
 	def get_action(self, state, valid_actions):
+		'''
+		Chooses an action based on the current state. Assumes DQN output is 
+		organized in the following way (with n possible moves in the game and
+		m possible pokemon to switch to). The action chosen will be the action
+		in valid_actions with the highest q value 
+
+		move_0
+		.
+		.
+		.
+		move_n
+		switch_pokemon_0
+		.
+		.
+		.
+		switch_pokemon_m
+		'''
 		rv = random.choice(valid_actions) + (None,) 
 
 		#NOTE: grab zeroth element b/c we only passed in one state
 		qs = self.get_qs(np.array([state]))[0] 
-		
-		#NOTE: sort actions so that our output indices always match the actions 
-		sorted_actions = []
+
+		formatted_actions = []
 		for action_index, action_name, action_type in valid_actions:
-			try:
-				if action_type == ActionType.Move:
-					action_dqn_index = MOVE_NAME_TO_INDEX[action_name]
-				elif action_type == ActionType.Switch:
-					action_dqn_index = POKEMON_NAME_TO_INDEX[action_name]
-				else:
-					self.log('ERROR: Somehow found invalid action type: '
-						f'{action_type}')
+			if action_type == ActionType.Move:
+				try:
+					action_q_index = (MOVE_NAME_TO_INDEX[action_name] - 
+						MOVE_NAME_TO_INDEX['Min'])
+				except KeyError:
 					return rv
-			except KeyError:
-				self.log(f'ERROR: Unrecognized action_name {action_name} ' 
-					f'with type {action_type}')
+			elif action_type == ActionType.Switch:
+				try:
+					action_q_index = (MOVE_NAME_TO_INDEX['Count'] + 
+						(POKEMON_NAME_TO_INDEX[action_name] - 
+							POKEMON_NAME_TO_INDEX['Min']))
+				except KeyError:
+					return rv
+			else:
+				self.log(f'Unexpected action_type {action_type}')
 				return rv
 
-			sorted_actions.append((action_dqn_index, action_index, action_name, 
-				action_type))
-		
-		sorted_actions = sorted(sorted_actions, key=lambda x: x[0])
-		
-		#NOTE: now sort by q values
-		formatted_actions = []
-		for q_index, (action_dqn_index, action_index, action_name, action_type) \
-			in enumerate(sorted_actions):
-
 			try:
-				formatted_actions.append((q_index, qs[q_index], 
-					(action_index, action_name, action_type)))
+				q_value = qs[action_q_index]
 			except IndexError:
-				self.log(f'ERROR: Bad q_index {q_index}')
-				if len(formatted_actions) > 0:
-					q_index, q_value, action = random.choice(formatted_actions)
-					return action, q_value
-				else:
-					return rv
+				q_value = 0
+				self.log(f'Unexpected index {action_q_index}')
+
+			formatted_actions.append((action_q_index, 
+				q_value, 
+				(action_index, action_name, action_type)))
 
 		#NOTE: As epsilon grows small, we make fewer random choices
 		if self.training and random.random() <= self.epsilon: 
