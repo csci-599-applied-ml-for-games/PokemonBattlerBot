@@ -143,8 +143,7 @@ class BotClient(showdown.Client):
 	):
 		self.should_write_replay = should_write_replay
 		self.done = False
-		self.replay_queue = replay_queue
-
+		
 		if expected_opponent == None:
 			raise Exception("No expected opponent found in arguments")
 		else:
