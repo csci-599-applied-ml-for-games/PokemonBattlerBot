@@ -40,6 +40,7 @@ from gamestate import GameState, health_sum, ko_count, clean_move_name
 from dqn import DQNAgent, ActionType
 
 LOGS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
+REPLAY_MEMORY_DIR = os.path.join(LOGS_DIR, 'replay_memory')
 BOT_DIR = os.path.dirname(__file__)
 TYPE_MAP = {}
 with open(os.path.join(BOT_DIR, 'data/PokemonTypes.csv'), 'r') as typefile:
@@ -137,9 +138,10 @@ class BotClient(showdown.Client):
 	def __init__(self, name='', password='', loop=None, max_room_logs=5000,
 		server_id='showdown', server_host=None, expected_opponent=None,
 		team=None, challenge=False, runType=RunType.Iterations, runTypeData=1,
-		agent=None, print_stats=False, trainer=False, save_model=True, 
-		replay_queue=None
+		agent=None, print_stats=False, trainer=False, save_model=True,
+		should_write_replay=False
 	):
+		self.should_write_replay = should_write_replay
 		self.done = False
 		self.replay_queue = replay_queue
 
@@ -168,8 +170,10 @@ class BotClient(showdown.Client):
 		self.action = None
 
 		self.logs_dir = LOGS_DIR
+		self.replay_memory_dir = REPLAY_MEMORY_DIR
 		if not os.path.exists(self.logs_dir):
 			os.mkdir(self.logs_dir)
+			os.mkdir(self.replay_memory_dir)
 		self.datestring = datetime.now().strftime('%y-%m-%d-%H-%M-%S')
 		self.update_log_paths()
 
@@ -201,11 +205,16 @@ class BotClient(showdown.Client):
 		self.log_file = os.path.join(self.logs_dir, 
 			f'{self.datestring}_Iteration{self.iterations_run}.txt')
 		self.agent.log_path = self.log_file
-		self.agent.replay_memory_path = os.path.join(self.logs_dir, 
-			f'{self.datestring}_Iteration{self.iterations_run}_'
-			'replaymemory.txt')
+		self.agent.replay_memory_path = os.path.join(
+			self.logs_dir, 
+			'replay_memory', 
+			f'{self.datestring}_Iteration{self.iterations_run}_replaymemory.txt'
+		)
 		self.agent.model_path = os.path.join(self.logs_dir, 
 			f'{self.datestring}_Iteration{self.iterations_run}.model')
+
+	def write_replay_memory(self):
+		self.agent.write_replay_memory()
 
 	def log(self, *args):
 		now = datetime.now()
@@ -355,10 +364,7 @@ class BotClient(showdown.Client):
 
 	def update_replay_memory(self, transition):
 		self.agent.update_replay_memory(transition)
-		if self.replay_queue != None:
-			self.log('updating replay_queue')
-			self.replay_queue.put(transition)
-
+		
 	async def on_receive(self, room_id, inp_type, params):
 		try:
 			self.log(f'Input type: {inp_type}')
@@ -703,6 +709,8 @@ class BotClient(showdown.Client):
 								float(self.wins + self.losses))
 							print(f'Win ratio: {win_ratio}')
 						self.done = True
+						if self.should_write_replay:
+							self.write_replay_memory()
 						sys.exit(0)
 
 				elif inp_type == '-ability':
@@ -921,6 +929,8 @@ class BotClient(showdown.Client):
 			self.weather = 'none'
 
 	def kill(self):
+		if self.should_write_replay:
+			self.write_replay()
 		sys.exit(0)
 
 

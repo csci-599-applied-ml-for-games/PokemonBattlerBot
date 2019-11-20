@@ -164,11 +164,15 @@ class DQNAgent():
 		self.log(f'Choice was {action}')
 		return action + (q_index,)
 
+	def write_replay_memory(self):
+		with open(self.replay_memory_path, 'w') as fd:
+			fd.write(f'{self.replay_memory}')
+
 	def train_only(self, minibatch_size, min_replay_memory_size):
 		self.log('Saving replay_memory')
 		if self.replay_memory_path:
-			with open(self.replay_memory_path, 'w') as fd:
-				fd.write(f'{self.replay_memory}')
+			self.write_replay_memory()
+
 		self.log('Saved replay_memory')
 
 		if len(self.replay_memory) < min_replay_memory_size:

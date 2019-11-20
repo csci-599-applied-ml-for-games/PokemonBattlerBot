@@ -8,7 +8,7 @@ from keras.models import load_model
 
 from dqn import DQNAgent, REPLAY_MEMORY_SIZE, create_model
 from gamestate import GameState
-from bot import RandomAgent, BotClient, RunType
+from bot import RandomAgent, BotClient, RunType, REPLAY_MEMORY_DIR
 
 DEBUG = True
 
@@ -34,8 +34,7 @@ class GameInfo():
 		self.bots = []
 
 def make_bot(un, pw, expected_opponent, team, challenge, trainer, games_info, 
-	game_index, epsilon=None, model_path=None, target_model_path=None, 
-	replay_queue=None
+	game_index, epsilon=None, model_path=None, target_model_path=None
 ):
 	
 	if trainer:
@@ -58,7 +57,7 @@ def make_bot(un, pw, expected_opponent, team, challenge, trainer, games_info,
 		name=un, password=pw, expected_opponent=expected_opponent, team=team, 
 		challenge=challenge, runType=RunType.Iterations, runTypeData=1, 
 		agent=agent, trainer=trainer, save_model=False, 
-		replay_queue=replay_queue
+		should_write_replay=(not trainer)
 	)
 	games_info[game_index].bots.append(bot)
 	bot.start()
@@ -118,8 +117,7 @@ if __name__ == '__main__':
 					kwargs={
 						'model_path': model_path, 
 						'target_model_path': target_model_path,
-						'epsilon': epsilon,
-						'replay_queue': replay_queue
+						'epsilon': epsilon
 					}, 
 					daemon=True)
 				bot1_process.start()
@@ -145,19 +143,28 @@ if __name__ == '__main__':
 			print(games_info[game_index].bots)
 			time.sleep(5)
 			#NOTE: wait until all games finish
-			any_alive = True
-			while any_alive:
-				any_alive = False
-				#NOTE: check if any bots have stalled for more than the timeout
-				for game_info in games_info:
-					if time.time() - game_info.start_time > timeout:
-						for bot in game_info.bots:
-							bot.kill() 
-					else:
-						for process, bot in zip(game_info.processes, game_info.bots):
-							if not bot.done:
-								any_alive = True
-			print('???')
+			# any_alive = True
+			# while any_alive:
+			# 	any_alive = False
+			# 	#NOTE: check if any bots have stalled for more than the timeout
+			# 	for game_info in games_info:
+			# 		if time.time() - game_info.start_time > timeout:
+			# 			for bot in game_info.bots:
+			# 				bot.kill() 
+			# 		else:
+			# 			for process, bot in zip(game_info.processes, game_info.bots):
+			# 				if not bot.done:
+			# 					any_alive = True
+			
+			start = time.time()
+			while (len(os.listdir(REPLAY_MEMORY_DIR)) < games_to_play and
+				(time.time() - start < timeout)
+			):
+				time.sleep(1)
+				
+			#NOTE: clear out the replay memory directory
+			for content in os.listdir(REPLAY_MEMORY_DIR):
+				os.remove(os.path(REPLAY_MEMORY_DIR, content))
 
 			#NOTE: train
 			#NOTE: create/load DQN and target DQN in main thread
@@ -212,4 +219,5 @@ if __name__ == '__main__':
 				#TODO: change me
 				if iteration == 500:
 					debug_log('Moving on to next adversarial network iteration')
-			break
+			if iteration == 2:
+				break
