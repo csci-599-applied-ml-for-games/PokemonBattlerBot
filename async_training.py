@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 import time
-from multiprocessing import Process, Queue
+from multiprocessing import Process
 from collections import deque
 
 from keras.models import load_model
@@ -98,7 +98,6 @@ if __name__ == '__main__':
 
 		while True:
 			debug_log(f'Starting iteration {iteration}')
-			replay_queue = Queue()
 			#NOTE: start two processes for each game 
 			for game_index in range(games_to_play): 
 				#NOTE: get the account information
@@ -140,21 +139,7 @@ if __name__ == '__main__':
 				games_info[game_index].processes.append(bot1_process)
 				games_info[game_index].processes.append(bot2_process)
 
-			print(games_info[game_index].bots)
 			time.sleep(5)
-			#NOTE: wait until all games finish
-			# any_alive = True
-			# while any_alive:
-			# 	any_alive = False
-			# 	#NOTE: check if any bots have stalled for more than the timeout
-			# 	for game_info in games_info:
-			# 		if time.time() - game_info.start_time > timeout:
-			# 			for bot in game_info.bots:
-			# 				bot.kill() 
-			# 		else:
-			# 			for process, bot in zip(game_info.processes, game_info.bots):
-			# 				if not bot.done:
-			# 					any_alive = True
 			
 			start = time.time()
 			while (len(os.listdir(REPLAY_MEMORY_DIR)) < games_to_play and
@@ -164,14 +149,20 @@ if __name__ == '__main__':
 				
 			#NOTE: clear out the replay memory directory
 			for content in os.listdir(REPLAY_MEMORY_DIR):
-				os.remove(os.path.join(REPLAY_MEMORY_DIR, content))
+				file_path = os.path.join(REPLAY_MEMORY_DIR, content)
+				with open(file_path, 'r') as fd:
+					s = fd.read()
+				try:
+					data = eval(s)
+					replay_memory.extend(data)
+				except SyntaxError:
+					pass
+				os.remove(file_path)
+
+			print('replay memory len is ', len(replay_memory))
 
 			#NOTE: train
 			#NOTE: create/load DQN and target DQN in main thread
-			while not replay_queue.empty():
-				transition = replay_queue.get()
-				replay_memory.append(transition)
-
 			debug_log(f'on iteration {iteration}, replay_memory has size {len(replay_memory)}')
 
 			agent = DQNAgent(INPUT_SHAPE, training=True, 
