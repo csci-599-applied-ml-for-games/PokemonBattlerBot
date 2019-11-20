@@ -169,9 +169,11 @@ class BotClient(showdown.Client):
 		self.action = None
 
 		self.logs_dir = LOGS_DIR
-		self.replay_memory_dir = REPLAY_MEMORY_DIR
 		if not os.path.exists(self.logs_dir):
 			os.mkdir(self.logs_dir)
+		
+		self.replay_memory_dir = REPLAY_MEMORY_DIR
+		if not os.path.exists(self.replay_memory_dir):
 			os.mkdir(self.replay_memory_dir)
 		self.datestring = datetime.now().strftime('%y-%m-%d-%H-%M-%S')
 		self.update_log_paths()
