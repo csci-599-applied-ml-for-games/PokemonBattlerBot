@@ -164,7 +164,7 @@ if __name__ == '__main__':
 				
 			#NOTE: clear out the replay memory directory
 			for content in os.listdir(REPLAY_MEMORY_DIR):
-				os.remove(os.path(REPLAY_MEMORY_DIR, content))
+				os.remove(os.path.join(REPLAY_MEMORY_DIR, content))
 
 			#NOTE: train
 			#NOTE: create/load DQN and target DQN in main thread
