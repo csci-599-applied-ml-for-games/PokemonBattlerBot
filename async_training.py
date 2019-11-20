@@ -201,6 +201,7 @@ if __name__ == '__main__':
 			#NOTE: check if we should move to the next epoch
 			#TODO: replace this loss check with moving average win rate or 
 			#TODO: something
+			time.sleep(5)
 			if history != None:
 				print(history.history)
 				#TODO: change me
