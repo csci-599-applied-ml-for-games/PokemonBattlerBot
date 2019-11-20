@@ -57,6 +57,118 @@ ACTIVE_POKEMON_BOOST = {
 	'NotFound': increment_team_index()
 }
 
+ACTIVE_POKEMON_NAME_TO_INDEX = {
+	'Pelipper': increment_team_index(),
+	'Greninja': increment_team_index(), 
+	'Swampert': increment_team_index(),
+	'Manaphy': increment_team_index(),
+	'Ferrothorn': increment_team_index(),
+	'Tornadus': increment_team_index(),
+	'Tornadus-Therian': increment_team_index(), 
+	'NotFound': increment_team_index(), 
+}
+_, ACTIVE_INDEX_TO_POKEMON_NAME = attribute_dict_setup(ACTIVE_POKEMON_NAME_TO_INDEX)
+
+ACTIVE_MOVE_NAME_TO_INDEX = {
+	'knockoff': increment_team_index(),
+	'uturn': increment_team_index(),
+	'scald': increment_team_index(),
+	'roost': increment_team_index(),
+	'hydropump': increment_team_index(),  
+	'darkpulse': increment_team_index(),
+	'watershuriken': increment_team_index(),
+	'spikes': increment_team_index(),
+	'waterfall': increment_team_index(),
+	'earthquake': increment_team_index(),
+	'icepunch': increment_team_index(),
+	'superpower': increment_team_index(),
+	'tailglow': increment_team_index(),
+	'surf': increment_team_index(),
+	'icebeam': increment_team_index(),
+	'rest': increment_team_index(), 
+	'stealthrock': increment_team_index(),
+	'toxic': increment_team_index(),
+	'powerwhip': increment_team_index(),
+	'hurricane': increment_team_index(),
+	'defog': increment_team_index(),
+
+	# Z-moves only below this comment
+	'hydrovortex': increment_team_index(),
+	'NotFound': increment_team_index(),
+}
+_, ACTIVE_INDEX_TO_MOVE_NAME = attribute_dict_setup(ACTIVE_MOVE_NAME_TO_INDEX)
+
+ACTIVE_TYPE_NAME_TO_INDEX = {
+	'Normal': increment_team_index(),
+	'Fire': increment_team_index(),
+	'Water': increment_team_index(),
+	'Grass': increment_team_index(),
+	'Electric': increment_team_index(),
+	'Ice': increment_team_index(),
+	'Fighting': increment_team_index(),
+	'Poison': increment_team_index(),
+	'Ground': increment_team_index(),
+	'Flying': increment_team_index(),
+	'Psychic': increment_team_index(),
+	'Bug': increment_team_index(),
+	'Ghost': increment_team_index(),
+	'Dark': increment_team_index(),
+	'Dragon': increment_team_index(),
+	'Steel': increment_team_index(),
+	'Fairy': increment_team_index(),
+	'NotFound': increment_team_index(),
+}
+_, ACTIVE_INDEX_TO_TYPE_NAME = attribute_dict_setup(ACTIVE_TYPE_NAME_TO_INDEX)
+
+ACTIVE_STATUS_NAME_TO_INDEX = {
+	'brn': increment_team_index(),
+	'par': increment_team_index(),
+	'slp': increment_team_index(),
+	'frz': increment_team_index(),
+	'psn': increment_team_index(),
+	'tox': increment_team_index(),
+	'confusion': increment_team_index(),
+	'curse': increment_team_index(),
+	'flinch': increment_team_index(),
+	'trapped': increment_team_index(),
+	'trapper': increment_team_index(),
+	'partiallytrapped': increment_team_index(),
+	'lockedmove': increment_team_index(),
+	'twoturnmove': increment_team_index(),
+	'choicelock': increment_team_index(),
+	'mustrecharge': increment_team_index(),
+	'futuremove': increment_team_index(),
+	'healreplacement': increment_team_index(),
+	'stall': increment_team_index(),
+	'gem': increment_team_index(),
+	'raindance': increment_team_index(),
+	'primordialsea': increment_team_index(),
+	'sunnyday': increment_team_index(),
+	'desolateland': increment_team_index(),
+	'sandstorm': increment_team_index(),
+	'hail': increment_team_index(),
+	'deltastream': increment_team_index(),
+	'arceus': increment_team_index(),
+	'silvally': increment_team_index(),
+	'NotFound': increment_team_index(),
+}
+_, ACTIVE_INDEX_TO_STATUS_NAME = attribute_dict_setup(ACTIVE_STATUS_NAME_TO_INDEX)
+
+# Magic number to normalize stat values for input vector
+# For eg. 1245 spa => 1245/2000 = 0.6225 value in vector
+STAT_NORMALIZER = 2000
+ACTIVE_STAT_NAME_TO_INDEX = {
+	'atk': increment_team_index(),
+	'def': increment_team_index(),
+	'spa': increment_team_index(),
+	'spd': increment_team_index(),
+	'spe': increment_team_index(),
+	'NotFound': increment_team_index(),
+}
+_, INDEX_TO_STAT_NAME = attribute_dict_setup(ACTIVE_STAT_NAME_TO_INDEX)
+
+ACTIVE_NORMALIZED_HEALTH = increment_team_index()
+
 # Magic number to normalize the quantity of an entry hazard for 
 # input vactor. For eg. 3 spikes => 3/10 = 0.3 value in vector
 MAX_ENTRY_HAZARD_COUNT = 10
@@ -142,6 +254,7 @@ STATUS_NAME_TO_INDEX = {
 	'psn': increment_index(),
 	'tox': increment_index(),
 	'confusion': increment_index(),
+	'curse': increment_index(),
 	'flinch': increment_index(),
 	'trapped': increment_index(),
 	'trapper': increment_index(),
@@ -198,6 +311,9 @@ FAINTED_STATE = increment_index()
 NORMALIZED_HEALTH = increment_index()
 
 ATTRIBUTES_PER_POKEMON = INDEX_TRACKER + 1
+
+def clean_move_name(move_name):
+	return move_name.lower().replace(' ', '')
 
 def start_of_pokemon(player, team_position):
 	return (SHARED_ATTRIBUTES_COUNT + 
@@ -277,6 +393,8 @@ class GameState():
 
 	def clear_all_weather(self):
 		for weather_name in WEATHER_NAME_TO_INDEX:
+			if weather_name in ['Min', 'Count']:
+				continue
 			self._set_weather(weather_name, 0.0)
 
 	def clear_weather(self, weather_name):
@@ -321,6 +439,9 @@ class GameState():
 	def set_health(self, player, name, value):
 		position = self.name_to_position[player][name]
 		self._set_health(player, position, value)
+		
+		if self.check_active(player, name):
+			self.set_player_attribute(player, ACTIVE_NORMALIZED_HEALTH, value)
 
 	def init_health(self, player):
 		for team_position in range(len(self.name_to_position[player])):
@@ -381,6 +502,90 @@ class GameState():
 
 		team_position = self.name_to_position[player][name]
 		self._set_active(player, team_position, 1.0)
+		
+		for set_pokemon_name in ACTIVE_POKEMON_NAME_TO_INDEX:
+			if set_pokemon_name in ['Min', 'Count']:
+				continue
+			index = ACTIVE_POKEMON_NAME_TO_INDEX[set_pokemon_name]
+			if set_pokemon_name == name:
+				self.set_player_attribute(player, index, 1.0)
+			else:
+				self.set_player_attribute(player, index, 0.0)
+		
+		moves = self.check_moves(player, name)
+		for set_move_name in ACTIVE_MOVE_NAME_TO_INDEX:
+			if set_move_name in ['Min', 'Count']:
+				continue
+			index = ACTIVE_MOVE_NAME_TO_INDEX[set_move_name]
+			if set_move_name in moves:
+				self.set_player_attribute(player, index, 
+					self._get_move(player, team_position, 
+						MOVE_NAME_TO_INDEX[set_move_name]))
+			else: 
+				self.set_player_attribute(player, index, 0.0)
+
+		types = self.check_types(player, name)
+		for set_type_name in ACTIVE_TYPE_NAME_TO_INDEX:
+			if set_type_name in ['Min', 'Count']:
+				continue
+			index = ACTIVE_TYPE_NAME_TO_INDEX[set_type_name]
+			if set_type_name in types:
+				self.set_player_attribute(player, index, 1.0)
+			else:
+				self.set_player_attribute(player, index, 0.0)
+
+		statuses = self.check_status(player, name)
+		for set_status_name in ACTIVE_STATUS_NAME_TO_INDEX:
+			if set_status_name in ['Min', 'Count']:
+				continue
+			index = ACTIVE_STATUS_NAME_TO_INDEX[set_status_name]
+			if set_status_name in statuses:
+				self.set_player_attribute(player, index, 1.0)
+			else:
+				self.set_player_attribute(player, index, 0.0)
+
+		self.set_player_attribute(player, ACTIVE_NORMALIZED_HEALTH, 
+			self.check_health(player, name))
+
+	def check_active_slot(self, player):
+		pokemon_names = []
+		for get_pokemon_name in ACTIVE_POKEMON_NAME_TO_INDEX:
+			if get_pokemon_name in ['Min', 'Count']:
+				continue
+			index = ACTIVE_POKEMON_NAME_TO_INDEX[get_pokemon_name]
+			if self.get_player_attribute(player, index) == 1.0:
+				pokemon_names.append(get_pokemon_name)
+		
+		moves = []
+		for get_move_name in ACTIVE_MOVE_NAME_TO_INDEX:
+			if get_move_name in ['Min', 'Count']:
+				continue
+			index = ACTIVE_MOVE_NAME_TO_INDEX[get_move_name]
+			value = self.get_player_attribute(player, index)
+			if value > 0.0:
+				moves.append((get_move_name, value))
+
+		types = []
+		for get_type_name in ACTIVE_TYPE_NAME_TO_INDEX:
+			if get_type_name in ['Min', 'Count']:
+				continue
+			index = ACTIVE_TYPE_NAME_TO_INDEX[get_type_name]
+			value = self.get_player_attribute(player, index)
+			if value == 1.0:
+				types.append(get_type_name)
+
+		statuses = []
+		for get_status_name in ACTIVE_STATUS_NAME_TO_INDEX:
+			if get_status_name in ['Min', 'Count']:
+				continue
+			index = ACTIVE_STATUS_NAME_TO_INDEX[get_status_name]
+			value = self.get_player_attribute(player, index)
+			if value == 1.0:
+				statuses.append((get_status_name, value))
+
+		health = self.get_player_attribute(player, ACTIVE_NORMALIZED_HEALTH)
+
+		return pokemon_names, moves, types, statuses, health
 
 	def check_active(self, player, name):
 		'''
@@ -429,10 +634,17 @@ class GameState():
 	def _set_move(self, player, team_position, move_position, value):
 		self.set_pokemon_attribute(player, team_position, move_position, value)
 
+	def _get_move(self, player, team_position, move_position):
+		return self.get_pokemon_attribute(player, team_position, move_position)
+
 	def set_move(self, player, pokemon_name, move_name, pp, max_pp):
 		team_position = self.name_to_position[player][pokemon_name]
 		move_position = MOVE_NAME_TO_INDEX.get(move_name, MOVE_NAME_TO_INDEX['NotFound'])
-		self._set_move(player, team_position, move_position, pp/max_pp)
+		value = float(pp) / float(max_pp)
+		self._set_move(player, team_position, move_position, value)
+
+		index = ACTIVE_MOVE_NAME_TO_INDEX[move_name]
+		self.set_player_attribute(player, index, value)
 
 	def check_moves(self, player, pokemon_name):
 		pokemon_name = GameState.pokemon_name_clean(pokemon_name)
@@ -444,7 +656,7 @@ class GameState():
 
 		start_of_move_indices = start_of_pokemon(player, team_position)
 		for move_index in range(start_checking, end_checking):
-			if self.vector_list[move_index] == 1.0:
+			if self.vector_list[move_index] > 0.0:
 				moves.append(INDEX_TO_MOVE_NAME[move_index - 
 					start_of_move_indices])
 		return moves
@@ -498,11 +710,21 @@ class GameState():
 		team_position = self.name_to_position[player][name]
 		status_position = STATUS_NAME_TO_INDEX.get(status_name, STATUS_NAME_TO_INDEX['NotFound'])
 		self._set_status(player, team_position, status_position, 1.0)
+
+		if self.check_active(player, name):
+			index = ACTIVE_STATUS_NAME_TO_INDEX.get(status_name, 
+				ACTIVE_STATUS_NAME_TO_INDEX['NotFound'])
+			self.set_player_attribute(player, index, 1.0)
 	
 	def remove_status(self, player, name, status_name):
 		team_position = self.name_to_position[player][name]
 		status_position = STATUS_NAME_TO_INDEX.get(status_name, STATUS_NAME_TO_INDEX['NotFound'])
 		self._set_status(player, team_position, status_position, 0.0)
+		
+		if self.check_active(player, name):
+			index = ACTIVE_STATUS_NAME_TO_INDEX.get(status_name, 
+				ACTIVE_STATUS_NAME_TO_INDEX['NotFound'])
+			self.set_player_attribute(player, index, 0.0)
 
 	def check_status(self, player, name):
 		name = GameState.pokemon_name_clean(name)
@@ -529,6 +751,8 @@ class GameState():
 
 	def reset_boosts(self, player):
 		for boost_name in ACTIVE_POKEMON_BOOST:
+			if boost_name in ['Min', 'Count']:
+				continue
 			self.set_boost(player, boost_name, 0.5)
 
 	def _set_boost(self, player, boost_position, value):
@@ -554,6 +778,8 @@ class GameState():
 	def all_boosts(self, player):
 		boosts = []
 		for boost_name in ACTIVE_POKEMON_BOOST:
+			if boost_name in ['Min', 'Count']:
+				continue
 			boosts.append((boost_name, self.get_boost(player, boost_name)))
 		return boosts
 
