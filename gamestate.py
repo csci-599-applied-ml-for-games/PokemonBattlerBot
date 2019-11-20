@@ -197,6 +197,7 @@ POKEMON_NAME_TO_INDEX = {
 '''
 
 POKEMON_NAME_TO_INDEX = {
+	'Pelipper' :  INDEX_TRACKER,
 	'Bulbasaur' :  increment_index(),
 	'Ivysaur' :  increment_index(),
 	'Venusaur' :  increment_index(),
@@ -475,7 +476,6 @@ POKEMON_NAME_TO_INDEX = {
 	'Taillow' :  increment_index(),
 	'Swellow' :  increment_index(),
 	'Wingull' :  increment_index(),
-	'Pelipper' :  increment_index(),
 	'Ralts' :  increment_index(),
 	'Kirlia' :  increment_index(),
 	'Gardevoir' :  increment_index(),
