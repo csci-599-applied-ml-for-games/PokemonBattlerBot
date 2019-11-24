@@ -3,6 +3,7 @@ from datetime import datetime
 import time
 from multiprocessing import Process
 from collections import deque
+import re
 
 from keras.models import load_model
 
@@ -74,6 +75,8 @@ if __name__ == '__main__':
 	accounts = [
 		('USCBot1', 'USCBot1'),
 		('USCBot2', 'USCBot2'),
+		('USCBot4', 'USCBot4'),
+		('USCBot5', 'USCBot5'),
 		('USCBot9', 'USCBot9'),
 		('USCBot10', 'USCBot10')
 	]
@@ -99,9 +102,30 @@ if __name__ == '__main__':
 		target_model_path = model_path
 
 		target_update_counter = 0
-
+		debug_log(f'Starting adversarial network iteration {epoch}')
 		while True:
 			debug_log(f'Starting iteration {iteration}')
+			debug_log(f'model_path {model_path}')
+			debug_log(f'target_model_path {target_model_path}')
+
+			if epoch == 0:
+				trainer_model_path = None
+			else:
+				max_iteration = -1
+				for content in os.listdir(LOGS_DIR):
+					if (content.startswith(f'Epoch{epoch - 1}') and 
+						content.endswith('.model')
+					):
+						result = re.search(r'Iteration(?P<iteration>[0-9]+)', 
+							content
+						)
+						content_iteration = int(result.group('iteration'))
+						if content_iteration > max_iteration:
+							target_model_path = os.path.join(LOGS_DIR, content) 
+							max_iteration = content_iteration
+
+			debug_log(f'trainer_model_path {target_model_path}')
+
 			#NOTE: start two processes for each game 
 			for game_index in range(games_to_play): 
 				#NOTE: get the account information
@@ -127,10 +151,6 @@ if __name__ == '__main__':
 
 				time.sleep(5) #NOTE: the challenger needs to come a little after the other bot is set up
 
-				if epoch == 0:
-					trainer_model_path = None
-				else:
-					trainer_model_path = original_model_path
 				bot2_process = Process(target=make_bot, 
 					args=(un2, pw2, un1, team, True, True, games_info, 
 						game_index
@@ -182,8 +202,6 @@ if __name__ == '__main__':
 						debug_log('Permission error when removing the file')
 						time.sleep(1)
 
-			debug_log('replay memory len is ', len(replay_memory))
-
 			#NOTE: train
 			#NOTE: create/load DQN and target DQN in main thread
 			debug_log(f'on iteration {iteration}, replay_memory has size {len(replay_memory)}')
@@ -234,3 +252,5 @@ if __name__ == '__main__':
 				if iteration == 100:
 					debug_log('Moving on to next adversarial network iteration')
 					break
+			if iteration == 2:
+				break
