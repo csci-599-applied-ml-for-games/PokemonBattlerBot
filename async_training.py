@@ -154,6 +154,9 @@ if __name__ == '__main__':
 			#NOTE: kill any lingering processes
 			for game_info in games_info:
 				for process in game_info.processes:
+					join_timeout = timeout - (time.time() - start) 
+					if join_timeout > 0:
+						process.join(join_timeout)
 					if process.is_alive():
 						process.terminate()
 
