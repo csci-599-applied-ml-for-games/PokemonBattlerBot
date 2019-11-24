@@ -234,5 +234,3 @@ if __name__ == '__main__':
 				if iteration == 100:
 					debug_log('Moving on to next adversarial network iteration')
 					break
-			if iteration == 5:
-				break
