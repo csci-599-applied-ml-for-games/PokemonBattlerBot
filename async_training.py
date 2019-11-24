@@ -17,7 +17,8 @@ LOGS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
 
 INPUT_SHAPE = (GameState.vector_dimension(),)
 
-MIN_REPLAY_MEMORY_SIZE = 3000
+MINIBATCH_SIZE = 64
+MIN_REPLAY_MEMORY_SIZE = 1000
 
 def debug_log(*args):
 	if DEBUG:
@@ -63,14 +64,16 @@ def make_bot(un, pw, expected_opponent, team, challenge, trainer, games_info,
 	bot.start()
 
 if __name__ == '__main__':
-	timeout = 1200
+	timeout = 240
 	epsilon = 1
 	epsilon_decay = 0.99
 	min_epsilon = 0.001
-	epochs = 1
+	epochs = 2
 	games_to_play = 1
 	games_info = [GameInfo() for _ in range(games_to_play)]
 	accounts = [
+		('USCBot1', 'USCBot1'),
+		('USCBot2', 'USCBot2'),
 		('USCBot9', 'USCBot9'),
 		('USCBot10', 'USCBot10')
 	]
@@ -88,6 +91,7 @@ if __name__ == '__main__':
 		else:
 			model = agent.model
 
+		epsilon = 1
 		iteration = 0
 		original_model_path = os.path.join(LOGS_DIR, f'Epoch{epoch}_Iteration{iteration}.model')
 		model.save(original_model_path)
@@ -146,7 +150,13 @@ if __name__ == '__main__':
 				(time.time() - start < timeout)
 			):
 				time.sleep(1)
-				
+			
+			#NOTE: kill any lingering processes
+			for game_info in games_info:
+				for process in game_info.processes:
+					if process.is_alive():
+						process.terminate()
+
 			#NOTE: clear out the replay memory directory
 			for content in os.listdir(REPLAY_MEMORY_DIR):
 				file_path = os.path.join(REPLAY_MEMORY_DIR, content)
@@ -157,9 +167,15 @@ if __name__ == '__main__':
 					replay_memory.extend(data)
 				except SyntaxError:
 					pass
-				os.remove(file_path)
 
-			print('replay memory len is ', len(replay_memory))
+				for i in range(5):
+					try:
+						os.remove(file_path)
+						break
+					except PermissionError:
+						time.sleep(1)
+
+			debug_log('replay memory len is ', len(replay_memory))
 
 			#NOTE: train
 			#NOTE: create/load DQN and target DQN in main thread
@@ -170,7 +186,7 @@ if __name__ == '__main__':
 			)
 			agent.target_model = load_model(target_model_path)
 			#NOTE: train newly loaded model
-			history = agent.train_only(MIN_REPLAY_MEMORY_SIZE, 
+			history = agent.train_only(MINIBATCH_SIZE, 
 				MIN_REPLAY_MEMORY_SIZE
 			)
 
@@ -206,9 +222,8 @@ if __name__ == '__main__':
 			#TODO: replace this loss check with moving average win rate or 
 			#TODO: something
 			if history != None:
-				print(history.history)
+				debug_log(history.history)
 				#TODO: change me
-				if iteration == 500:
+				if iteration == 100:
 					debug_log('Moving on to next adversarial network iteration')
-			if iteration == 2:
-				break
+					break
