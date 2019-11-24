@@ -160,19 +160,23 @@ if __name__ == '__main__':
 			#NOTE: clear out the replay memory directory
 			for content in os.listdir(REPLAY_MEMORY_DIR):
 				file_path = os.path.join(REPLAY_MEMORY_DIR, content)
+				debug_log('Extending with file {}'.format(file_path))
 				with open(file_path, 'r') as fd:
 					s = fd.read()
 				try:
 					data = eval(s)
 					replay_memory.extend(data)
 				except SyntaxError:
-					pass
+					debug_log('hit syntax error')
+					debug_log(f'file content with syntax error\n{s}')
+					debug_log('')
 
 				for i in range(5):
 					try:
 						os.remove(file_path)
 						break
 					except PermissionError:
+						debug_log('Permission error when removing the file')
 						time.sleep(1)
 
 			debug_log('replay memory len is ', len(replay_memory))
@@ -227,3 +231,5 @@ if __name__ == '__main__':
 				if iteration == 100:
 					debug_log('Moving on to next adversarial network iteration')
 					break
+			if iteration == 5:
+				break
