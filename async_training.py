@@ -303,6 +303,7 @@ if __name__ == '__main__':
 						debug_log('Moving on to next adversarial network iteration')
 						break
 					elif iteration >= 60:
+						debug_log('Moving on to next adversarial network iteration')
 						break
 
 	with open(os.path.join(LOGS_DIR, 'loss_history.csv'), 'w') as fd:
