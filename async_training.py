@@ -83,6 +83,7 @@ if __name__ == '__main__':
 	with open(os.path.join(ASYNC_TRAIN_DIR, 'teams/PokemonTeam'), 'rt') as teamfd:
 		team = teamfd.read()
 
+	keep_model_list = [] 
 	loss_history = []
 	agent = None
 	update_target_every = 2
@@ -117,10 +118,11 @@ if __name__ == '__main__':
 					if content_iteration > max_iteration:
 						trainer_model_path = os.path.join(LOGS_DIR, content) 
 						max_iteration = content_iteration
+			keep_model_list.append(trainer_model_path)
 			#NOTE: clean up logs and models from last epoch
 			for content in os.listdir(LOGS_DIR):
 				content_path = os.path.join(LOGS_DIR, content) 
-				if (content_path != trainer_model_path or 
+				if (content_path not in keep_model_list or 
 					content.endswith('Iteration0.txt')
 				):
 					os.remove(content_path)
@@ -300,9 +302,6 @@ if __name__ == '__main__':
 					if ((rolling_window_average_loss < 0.001) or 
 						(min_epsilon_iterations >= 100)
 					):
-						debug_log('Moving on to next adversarial network iteration')
-						break
-					elif iteration >= 60:
 						debug_log('Moving on to next adversarial network iteration')
 						break
 
