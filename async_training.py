@@ -125,7 +125,8 @@ if __name__ == '__main__':
 				if (content_path not in keep_model_list or 
 					content.endswith('Iteration0.txt')
 				):
-					os.remove(content_path)
+					if not os.path.isdir(content_path):
+						os.remove(content_path)
 
 		target_update_counter = 0
 		loss_history.append([])
@@ -272,7 +273,7 @@ if __name__ == '__main__':
 			debug_log(f'epsilon is now {epsilon}')
 
 			#NOTE: check if we should update target models
-			if target_update_counter > update_target_every:
+			if target_update_counter >= update_target_every:
 				target_update_counter = 0
 				target_model_path = model_path
 			else:
