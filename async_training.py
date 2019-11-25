@@ -249,7 +249,7 @@ if __name__ == '__main__':
 					history = agent.train_only(MINIBATCH_SIZE, 
 						MIN_REPLAY_MEMORY_SIZE
 					)
-					sum_loss += history.history.get('loss', 0)
+					sum_loss += history.history.get('loss', [0])[0]
 				average_loss = sum_loss / float(train_loops)
 			else:
 				history = None
@@ -286,6 +286,7 @@ if __name__ == '__main__':
 
 			if history != None:
 				loss = average_loss
+				debug_log(f'Average Loss over 50 trainings: {loss}')
 				if loss != None:
 					loss_history[epoch].append(loss)
 
@@ -301,7 +302,7 @@ if __name__ == '__main__':
 					):
 						debug_log('Moving on to next adversarial network iteration')
 						break
-					elif iteration >= 10:
+					elif iteration >= 60:
 						break
 
 	with open(os.path.join(LOGS_DIR, 'loss_history.csv'), 'w') as fd:
