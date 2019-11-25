@@ -33,10 +33,9 @@ class GameInfo():
 	def __init__(self):
 		self.start_time = 0.0
 		self.processes = []
-		self.bots = []
 
-def make_bot(un, pw, expected_opponent, team, challenge, trainer, games_info, 
-	game_index, epsilon=None, model_path=None, target_model_path=None
+def make_bot(un, pw, expected_opponent, team, challenge, trainer, epsilon=None, 
+	model_path=None, target_model_path=None
 ):
 	
 	if trainer:
@@ -61,7 +60,6 @@ def make_bot(un, pw, expected_opponent, team, challenge, trainer, games_info,
 		agent=agent, trainer=trainer, save_model=False, 
 		should_write_replay=(not trainer)
 	)
-	games_info[game_index].bots.append(bot)
 	bot.start()
 
 if __name__ == '__main__':
@@ -70,7 +68,7 @@ if __name__ == '__main__':
 	epsilon_decay = 0.99
 	min_epsilon = 0.001
 	epochs = 2
-	games_to_play = 1
+	games_to_play = 2
 	games_info = [GameInfo() for _ in range(games_to_play)]
 	accounts = [
 		('USCBot1', 'USCBot1'),
@@ -136,13 +134,10 @@ if __name__ == '__main__':
 				un1, pw1 = account1
 				un2, pw2 = account2
 				
-				games_info[game_index].bots = []
 				games_info[game_index].processes = []
 
 				bot1_process = Process(target=make_bot, 
-					args=(un1, pw1, un2, team, False,  False, games_info, 
-						game_index
-					), 
+					args=(un1, pw1, un2, team, False,  False), 
 					kwargs={
 						'model_path': model_path, 
 						'target_model_path': target_model_path,
@@ -154,9 +149,7 @@ if __name__ == '__main__':
 				time.sleep(5) #NOTE: the challenger needs to come a little after the other bot is set up
 
 				bot2_process = Process(target=make_bot, 
-					args=(un2, pw2, un1, team, True, True, games_info, 
-						game_index
-					),
+					args=(un2, pw2, un1, team, True, True),
 					kwargs={'model_path': trainer_model_path}, 
 					daemon=True) #TODO: add the model_path
 				bot2_process.start()
