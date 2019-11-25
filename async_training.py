@@ -18,9 +18,6 @@ LOGS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
 
 INPUT_SHAPE = (GameState.vector_dimension(),)
 
-MINIBATCH_SIZE = 64
-MIN_REPLAY_MEMORY_SIZE = 1000
-
 def debug_log(*args):
 	if DEBUG:
 		now = datetime.now()
@@ -63,12 +60,14 @@ def make_bot(un, pw, expected_opponent, team, challenge, trainer, epsilon=None,
 	bot.start()
 
 if __name__ == '__main__':
-	timeout = 240
+	timeout = 180
 	epsilon = 1
 	epsilon_decay = 0.99
 	min_epsilon = 0.001
 	epochs = 2
-	games_to_play = 2
+	games_to_play = 4
+	MINIBATCH_SIZE = games_to_play * 64
+	MIN_REPLAY_MEMORY_SIZE = games_to_play * 1000 
 	games_info = [GameInfo() for _ in range(games_to_play)]
 	accounts = [
 		('USCBot1', 'USCBot1'),
@@ -76,7 +75,9 @@ if __name__ == '__main__':
 		('USCBot4', 'USCBot4'),
 		('USCBot5', 'USCBot5'),
 		('USCBot9', 'USCBot9'),
-		('USCBot10', 'USCBot10')
+		('USCBot10', 'USCBot10'),
+		('USCBot11', 'USCBot11'),
+		('USCBot12', 'USCBot12')
 	]
 
 	with open(os.path.join(ASYNC_TRAIN_DIR, 'teams/PokemonTeam'), 'rt') as teamfd:
