@@ -66,8 +66,8 @@ if __name__ == '__main__':
 	min_epsilon = 0.001
 	epochs = 2
 	games_to_play = 4
-	MINIBATCH_SIZE = games_to_play * 64
-	MIN_REPLAY_MEMORY_SIZE = games_to_play * 1000 
+	MINIBATCH_SIZE = 64
+	MIN_REPLAY_MEMORY_SIZE = 1000 
 	games_info = [GameInfo() for _ in range(games_to_play)]
 	accounts = [
 		('USCBot1', 'USCBot1'),
@@ -85,7 +85,7 @@ if __name__ == '__main__':
 
 	loss_history = []
 	agent = None
-	update_target_every = 5
+	update_target_every = 2
 	for epoch in range(epochs):
 		replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
 		if epoch == 0:
@@ -117,6 +117,13 @@ if __name__ == '__main__':
 					if content_iteration > max_iteration:
 						trainer_model_path = os.path.join(LOGS_DIR, content) 
 						max_iteration = content_iteration
+			#NOTE: clean up logs and models from last epoch
+			for content in os.listdir(LOGS_DIR):
+				content_path = os.path.join(LOGS_DIR, content) 
+				if (content_path != trainer_model_path or 
+					content.endswith('Iteration0.txt')
+				):
+					os.remove(content_path)
 
 		target_update_counter = 0
 		loss_history.append([])
@@ -162,10 +169,33 @@ if __name__ == '__main__':
 			time.sleep(5)
 			
 			start = time.time()
-			while (len(os.listdir(REPLAY_MEMORY_DIR)) < games_to_play and
-				(time.time() - start < timeout)
-			):
+			while True:
 				time.sleep(1)
+				all_dead = True
+
+				for game_info in games_info:
+					any_dead = False
+					for process in game_info.processes:
+						if not process.is_alive():
+							any_dead = True
+
+					if any_dead:
+						for process in game_info.processes:
+							if process.is_alive():
+								process.join(10)
+								process.terminate()
+					else:
+						all_dead = False
+
+				if len(os.listdir(REPLAY_MEMORY_DIR)) >= games_to_play:
+					debug_log('Found all replays. Exiting')
+					break
+				elif (time.time() - start) >= timeout:
+					debug_log('Timing out. Exiting.')
+					break
+				elif all_dead:
+					debug_log('All processes are dead. Exiting.')
+					break
 			
 			#NOTE: kill any lingering processes
 			for game_info in games_info:
@@ -212,7 +242,17 @@ if __name__ == '__main__':
 			replay_memory.extend(minibatch)
 			#NOTE: train newly loaded model on random selection of old data
 			agent.replay_memory = replay_memory
-			history = agent.train_only(MINIBATCH_SIZE, MIN_REPLAY_MEMORY_SIZE)
+			sum_loss = 0
+			if len(replay_memory) > MIN_REPLAY_MEMORY_SIZE: 
+				train_loops = 50
+				for train_iteration in range(train_loops):
+					history = agent.train_only(MINIBATCH_SIZE, 
+						MIN_REPLAY_MEMORY_SIZE
+					)
+					sum_loss += history.history.get('loss', 0)
+				average_loss = sum_loss / float(train_loops)
+			else:
+				history = None
 
 			debug_log(f'on iteration {iteration}, replay_memory has size {len(replay_memory)}')
 
@@ -245,8 +285,7 @@ if __name__ == '__main__':
 			agent.save_model(model_path)
 
 			if history != None:
-				debug_log(history.history)
-				loss = history.history.get('loss')
+				loss = average_loss
 				if loss != None:
 					loss_history[epoch].append(loss)
 
@@ -262,7 +301,7 @@ if __name__ == '__main__':
 					):
 						debug_log('Moving on to next adversarial network iteration')
 						break
-					elif iteration == 50:
+					elif iteration >= 10:
 						break
 
 	with open(os.path.join(LOGS_DIR, 'loss_history.csv'), 'w') as fd:

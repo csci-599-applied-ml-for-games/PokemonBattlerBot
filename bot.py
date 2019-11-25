@@ -897,6 +897,10 @@ class BotClient(showdown.Client):
 						self.has_challenged = True
 						time.sleep(1)
 						await self.challenge_expected()
+				elif inp_type == 'popup':
+					if 'Due to high load, you are limited to 12 battles and team validations every 3 minutes.' in params[0]:
+						self.log('killing')
+						self.kill()
 		except Exception as err:
 			self.log_error(err)
 
@@ -931,7 +935,7 @@ class BotClient(showdown.Client):
 
 	def kill(self):
 		if self.should_write_replay:
-			self.write_replay()
+			self.write_replay_memory()
 		sys.exit(0)
 
 
