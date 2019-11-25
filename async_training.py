@@ -62,8 +62,8 @@ def make_bot(un, pw, expected_opponent, team, challenge, trainer, epsilon=None,
 if __name__ == '__main__':
 	timeout = 180
 	epsilon = 1
-	epsilon_decay = 0.99
-	min_epsilon = 0.001
+	epsilon_decay = 0.98
+	min_epsilon = 0.01
 	epochs = 2
 	games_to_play = 4
 	MINIBATCH_SIZE = 64
@@ -298,7 +298,7 @@ if __name__ == '__main__':
 					)
 					debug_log(f'Rolling average (w={rolling_average_window}) loss: {rolling_window_average_loss}')
 					if ((rolling_window_average_loss < 0.001) or 
-						(min_epsilon_iterations >= 500)
+						(min_epsilon_iterations >= 100)
 					):
 						debug_log('Moving on to next adversarial network iteration')
 						break
