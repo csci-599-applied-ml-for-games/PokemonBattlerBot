@@ -96,12 +96,6 @@ if __name__ == '__main__':
 
 		epsilon = 1
 		iteration = 0
-		original_model_path = os.path.join(LOGS_DIR, 
-			f'Epoch{epoch}_Iteration{iteration}.model'
-		)
-		model.save(original_model_path)
-		model_path = original_model_path
-		target_model_path = model_path
 
 		if epoch == 0:
 			trainer_model_path = None
@@ -122,11 +116,18 @@ if __name__ == '__main__':
 			#NOTE: clean up logs and models from last epoch
 			for content in os.listdir(LOGS_DIR):
 				content_path = os.path.join(LOGS_DIR, content) 
-				if (content_path not in keep_model_list or 
+				if (content_path not in keep_model_list and 
 					content.endswith('Iteration0.txt')
 				):
 					if not os.path.isdir(content_path):
 						os.remove(content_path)
+
+		original_model_path = os.path.join(LOGS_DIR, 
+			f'Epoch{epoch}_Iteration{iteration}.model'
+		)
+		model.save(original_model_path)
+		model_path = original_model_path
+		target_model_path = model_path
 
 		target_update_counter = 0
 		loss_history.append([])
@@ -168,6 +169,8 @@ if __name__ == '__main__':
 				games_info[game_index].start_time = time.time()
 				games_info[game_index].processes.append(bot1_process)
 				games_info[game_index].processes.append(bot2_process)
+
+				time.sleep(1)
 
 			time.sleep(5)
 			
