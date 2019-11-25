@@ -84,7 +84,7 @@ if __name__ == '__main__':
 	with open(os.path.join(ASYNC_TRAIN_DIR, 'teams/PokemonTeam'), 'rt') as teamfd:
 		team = teamfd.read()
 
-	
+	loss_history = []
 	agent = None
 	update_target_every = 5
 	for epoch in range(epochs):
@@ -96,35 +96,37 @@ if __name__ == '__main__':
 
 		epsilon = 1
 		iteration = 0
-		original_model_path = os.path.join(LOGS_DIR, f'Epoch{epoch}_Iteration{iteration}.model')
+		original_model_path = os.path.join(LOGS_DIR, 
+			f'Epoch{epoch}_Iteration{iteration}.model'
+		)
 		model.save(original_model_path)
 		model_path = original_model_path
 		target_model_path = model_path
 
+		if epoch == 0:
+			trainer_model_path = None
+		else:
+			max_iteration = -1
+			for content in os.listdir(LOGS_DIR):
+				if (content.startswith(f'Epoch{epoch - 1}') and 
+					content.endswith('.model')
+				):
+					result = re.search(r'Iteration(?P<iteration>[0-9]+)', 
+						content
+					)
+					content_iteration = int(result.group('iteration'))
+					if content_iteration > max_iteration:
+						trainer_model_path = os.path.join(LOGS_DIR, content) 
+						max_iteration = content_iteration
+
 		target_update_counter = 0
+		loss_history.append([])
 		debug_log(f'Starting adversarial network iteration {epoch}')
+		debug_log(f'trainer_model_path {trainer_model_path}')
 		while True:
 			debug_log(f'Starting iteration {iteration}')
 			debug_log(f'model_path {model_path}')
 			debug_log(f'target_model_path {target_model_path}')
-
-			if epoch == 0:
-				trainer_model_path = None
-			else:
-				max_iteration = -1
-				for content in os.listdir(LOGS_DIR):
-					if (content.startswith(f'Epoch{epoch - 1}') and 
-						content.endswith('.model')
-					):
-						result = re.search(r'Iteration(?P<iteration>[0-9]+)', 
-							content
-						)
-						content_iteration = int(result.group('iteration'))
-						if content_iteration > max_iteration:
-							target_model_path = os.path.join(LOGS_DIR, content) 
-							max_iteration = content_iteration
-
-			debug_log(f'trainer_model_path {target_model_path}')
 
 			#NOTE: start two processes for each game 
 			for game_index in range(games_to_play): 
@@ -181,6 +183,7 @@ if __name__ == '__main__':
 						process.terminate()
 
 			#NOTE: clear out the replay memory directory
+			minibatch = deque()
 			for content in os.listdir(REPLAY_MEMORY_DIR):
 				file_path = os.path.join(REPLAY_MEMORY_DIR, content)
 				debug_log('Extending with file {}'.format(file_path))
@@ -188,7 +191,7 @@ if __name__ == '__main__':
 					s = fd.read()
 				try:
 					data = eval(s)
-					replay_memory.extend(data)
+					minibatch.extend(data)
 				except SyntaxError:
 					debug_log('hit syntax error')
 					debug_log(f'file content with syntax error\n{s}')
@@ -204,16 +207,20 @@ if __name__ == '__main__':
 
 			#NOTE: train
 			#NOTE: create/load DQN and target DQN in main thread
-			debug_log(f'on iteration {iteration}, replay_memory has size {len(replay_memory)}')
-
 			agent = DQNAgent(INPUT_SHAPE, training=True, 
-				replay_memory=replay_memory, copy_target_model=False
+				replay_memory=minibatch, copy_target_model=False
 			)
 			agent.target_model = load_model(target_model_path)
-			#NOTE: train newly loaded model
-			history = agent.train_only(MINIBATCH_SIZE, 
-				MIN_REPLAY_MEMORY_SIZE
-			)
+			#NOTE: train newly loaded model on new data
+			minibatch_history = agent.train_only(len(minibatch), len(minibatch))
+			if minibatch_history == None:
+				debug_log('ERROR: Unable to train on iteration\'s data')
+			replay_memory.extend(minibatch)
+			#NOTE: train newly loaded model on random selection of old data
+			agent.replay_memory = replay_memory
+			history = agent.train_only(MINIBATCH_SIZE, MIN_REPLAY_MEMORY_SIZE)
+
+			debug_log(f'on iteration {iteration}, replay_memory has size {len(replay_memory)}')
 
 			#NOTE: decay epsilon
 			if epsilon > min_epsilon:
@@ -232,7 +239,7 @@ if __name__ == '__main__':
 			if target_update_counter > update_target_every:
 				target_update_counter = 0
 				target_model_path = model_path
-			elif len(replay_memory) > MIN_REPLAY_MEMORY_SIZE:
+			else:
 				target_update_counter += 1
 
 			#NOTE: update model_path
@@ -243,14 +250,29 @@ if __name__ == '__main__':
 			)
 			agent.save_model(model_path)
 
-			#NOTE: check if we should move to the next epoch
-			#TODO: replace this loss check with moving average win rate or 
-			#TODO: something
 			if history != None:
 				debug_log(history.history)
-				#TODO: change me
-				if iteration == 100:
-					debug_log('Moving on to next adversarial network iteration')
-					break
-			if iteration == 2:
-				break
+				loss = history.history.get('loss')
+				if loss != None:
+					loss_history[epoch].append(loss)
+
+				rolling_average_window = 20
+				if len(loss_history[epoch]) > rolling_average_window:
+					rolling_window_average_loss = (
+						sum(loss_history[epoch][-1 * rolling_average_window:]) / 
+						float(rolling_average_window)
+					)
+					debug_log(f'Rolling average (w={rolling_average_window}) loss: {rolling_window_average_loss}')
+					if ((rolling_window_average_loss < 0.001) or 
+						(min_epsilon_iterations >= 500)
+					):
+						debug_log('Moving on to next adversarial network iteration')
+						break
+					elif iteration == 50:
+						break
+
+	with open(os.path.join(LOGS_DIR, 'loss_history.csv'), 'w') as fd:
+		fd.write('Adversarial Network Iteration,Game Iteration,Loss\n')
+		for epoch_index, epoch_history in enumerate(loss_history):
+			for game_iteration, loss in enumerate(epoch_history):
+				fd.write(f'{epoch_index},{game_iteration},{loss}\n')
