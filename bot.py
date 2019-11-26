@@ -135,7 +135,19 @@ class BotClient(showdown.Client):
 		if team == None:
 			raise Exception("No team found in arguments")
 		else:
+			with open(os.path.join(BOT_DIR, 'teams/PokemonTeamInvalid1'), 'rt') as teamfd:
+				team_ = teamfd.read()
+			with open(os.path.join(BOT_DIR, 'teams/PokemonTeam2'), 'rt') as teamfd:
+				team2 = teamfd.read()
 			self.team_text = team
+			# print(type(self.team_text))  # => str
+			# print(self.team_text)
+			self.validate_team('gen7ou', team)
+			# self.validate_team('gen7ou', team_)
+			# self.validate_team('gen7ou', team2)
+			# self.validate_team('gen7ou', team)
+			# self.validate_team('gen7ou', team)
+			# print("sent for validation!")
 
 		self.iterations_run = 0
 
