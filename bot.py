@@ -934,8 +934,6 @@ class BotClient(showdown.Client):
 			self.weather = 'none'
 
 	def kill(self):
-		if self.should_write_replay:
-			self.write_replay_memory()
 		sys.exit(0)
 
 
