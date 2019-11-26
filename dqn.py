@@ -20,7 +20,7 @@ from keras.optimizers import Adam
 LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
 
 DISCOUNT = 0.85
-REPLAY_MEMORY_SIZE = 100_000
+REPLAY_MEMORY_SIZE = 15_000 #TODO: this should probably not be global
 MIN_REPLAY_MEMORY_SIZE = 1000
 MINIBATCH_SIZE = 64
 
