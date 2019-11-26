@@ -1,3 +1,12 @@
+'''
+Usage:
+	asyn_training.py [--start_epsilon=<start_epsilon>] [--load_model=<load_model>]
+
+Options:
+	--start_epsilon A tool for continuing after a crash. Sets the starting epsilon for the first epoch
+	--load_model 	A tool for continuing after a crash. Sets the starting model for the first epoch
+'''
+
 import os
 from datetime import datetime
 import time
@@ -5,6 +14,7 @@ from multiprocessing import Process
 from collections import deque
 import re
 
+from docopt import docopt 
 from keras.models import load_model
 
 from dqn import DQNAgent, REPLAY_MEMORY_SIZE, create_model
@@ -60,8 +70,16 @@ def make_bot(un, pw, expected_opponent, team, challenge, trainer, epsilon=None,
 	bot.start()
 
 if __name__ == '__main__':
+	args = docopt(__doc__)
+
+	if args.get('--start_epsilon'):
+		start_epsilon = float(args['--start_epsilon'])
+	else:
+		start_epsilon = 1
+
+	start_model = args.get('--load_model')
+
 	timeout = 180
-	epsilon = 1
 	epsilon_decay = 0.98
 	min_epsilon = 0.01
 	epochs = 3
@@ -89,7 +107,10 @@ if __name__ == '__main__':
 	update_target_every = 2
 	for epoch in range(epochs):
 		replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
-		epsilon = 1
+		if epoch == 0:
+			epsilon = start_epsilon
+		else:
+			epsilon = 1
 		iteration = 0
 
 		if epoch == 0:
@@ -119,7 +140,11 @@ if __name__ == '__main__':
 
 		#NOTE: model is reused from previous AN iteration if possible
 		if epoch == 0:
-			model = create_model(INPUT_SHAPE)
+			if start_model == None:
+				model = create_model(INPUT_SHAPE)
+			else:
+				debug_log(f'Loading model at {start_model}')
+				model = load_model(start_model)
 		else:
 			model = agent.model
 		original_model_path = os.path.join(LOGS_DIR, 
