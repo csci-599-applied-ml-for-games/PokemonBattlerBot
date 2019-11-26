@@ -64,7 +64,7 @@ if __name__ == '__main__':
 	epsilon = 1
 	epsilon_decay = 0.98
 	min_epsilon = 0.01
-	epochs = 2
+	epochs = 3
 	games_to_play = 4
 	MINIBATCH_SIZE = 64
 	MIN_REPLAY_MEMORY_SIZE = 1000 
