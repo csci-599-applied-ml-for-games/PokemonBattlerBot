@@ -89,11 +89,6 @@ if __name__ == '__main__':
 	update_target_every = 2
 	for epoch in range(epochs):
 		replay_memory = deque(maxlen=REPLAY_MEMORY_SIZE)
-		if epoch == 0:
-			model = create_model(INPUT_SHAPE)
-		else:
-			model = agent.model
-
 		epsilon = 1
 		iteration = 0
 
@@ -122,6 +117,10 @@ if __name__ == '__main__':
 					if not os.path.isdir(content_path):
 						os.remove(content_path)
 
+		if epoch == 0:
+			model = create_model(INPUT_SHAPE)
+		else:
+			model = agent.model
 		original_model_path = os.path.join(LOGS_DIR, 
 			f'Epoch{epoch}_Iteration{iteration}.model'
 		)
@@ -283,12 +282,12 @@ if __name__ == '__main__':
 				target_update_counter += 1
 
 			#NOTE: update model_path
-			iteration += 1
 			model_path = os.path.join(
 				LOGS_DIR, 
 				f'Epoch{epoch}_Iteration{iteration}.model'
 			)
 			agent.save_model(model_path)
+			iteration += 1
 
 			if history != None:
 				loss = average_loss
