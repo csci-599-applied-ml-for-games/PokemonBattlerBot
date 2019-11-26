@@ -242,10 +242,14 @@ if __name__ == '__main__':
 			)
 			agent.target_model = load_model(target_model_path)
 			#NOTE: train newly loaded model on new data
-			minibatch_history = agent.train_only(len(minibatch), len(minibatch))
-			if minibatch_history == None:
-				debug_log('ERROR: Unable to train on iteration\'s data')
-			replay_memory.extend(minibatch)
+			if len(minibatch) > 0:
+				minibatch_history = agent.train_only(len(minibatch), len(minibatch))
+				if minibatch_history == None:
+					debug_log('ERROR: Unable to train on iteration\'s data')
+				replay_memory.extend(minibatch)
+			else:
+				debug_log('WARNING: Skipping minibatch training since no new data was found')
+
 			#NOTE: train newly loaded model on random selection of old data
 			agent.replay_memory = replay_memory
 			sum_loss = 0
