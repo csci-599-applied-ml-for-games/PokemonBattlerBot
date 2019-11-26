@@ -117,6 +117,7 @@ if __name__ == '__main__':
 					if not os.path.isdir(content_path):
 						os.remove(content_path)
 
+		#NOTE: model is reused from previous AN iteration if possible
 		if epoch == 0:
 			model = create_model(INPUT_SHAPE)
 		else:
