@@ -275,11 +275,10 @@ if __name__ == '__main__':
 			debug_log(f'epsilon is now {epsilon}')
 
 			#NOTE: check if we should update target models
+			target_update_counter += 1
 			if target_update_counter >= update_target_every:
 				target_update_counter = 0
-				target_model_path = model_path
-			else:
-				target_update_counter += 1
+				target_model_path = model_path				
 
 			#NOTE: update model_path
 			model_path = os.path.join(
