@@ -186,7 +186,8 @@ if __name__ == '__main__':
 					daemon=True)
 				bot1_process.start()
 
-				time.sleep(5) #NOTE: the challenger needs to come a little after the other bot is set up
+				time.sleep(30) #NOTE: the challenger needs to come a little after the other bot is set up
+				#NOTE: 30 seconds because model can be slow to load at times
 
 				bot2_process = Process(target=make_bot, 
 					args=(un2, pw2, un1, team, True, True),
