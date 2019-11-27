@@ -15,6 +15,7 @@ from collections import deque
 import re
 
 from docopt import docopt 
+import keras
 from keras.models import load_model
 
 from dqn import DQNAgent, REPLAY_MEMORY_SIZE, create_model
@@ -133,7 +134,9 @@ if __name__ == '__main__':
 			for content in os.listdir(LOGS_DIR):
 				content_path = os.path.join(LOGS_DIR, content) 
 				if (content_path not in keep_model_list and 
-					content.endswith('Iteration0.txt')
+					(content.endswith('Iteration0.txt') or 
+						content.endswith('.model')
+					)
 				):
 					if not os.path.isdir(content_path):
 						os.remove(content_path)
@@ -262,6 +265,7 @@ if __name__ == '__main__':
 
 			#NOTE: train
 			#NOTE: create/load DQN and target DQN in main thread
+			keras.backend.clear_session()
 			agent = DQNAgent(INPUT_SHAPE, training=True, 
 				replay_memory=minibatch, copy_target_model=False
 			)
@@ -336,6 +340,18 @@ if __name__ == '__main__':
 					):
 						debug_log('Moving on to next adversarial network iteration')
 						break
+
+			#NOTE: clean unused models 
+			for content in os.listdir(LOGS_DIR):
+				content_path = os.path.join(LOGS_DIR, content) 
+				if (content_path not in keep_model_list and 
+					content.endswith('.model') and 
+					content_path != model_path and
+					content_path != trainer_model_path and 
+					content_path != target_model_path  
+				):
+					if not os.path.isdir(content_path):
+						os.remove(content_path)
 
 	with open(os.path.join(LOGS_DIR, 'loss_history.csv'), 'w') as fd:
 		fd.write('Adversarial Network Iteration,Game Iteration,Loss\n')
