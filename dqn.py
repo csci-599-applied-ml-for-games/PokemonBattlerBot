@@ -36,7 +36,8 @@ def create_model(input_shape):
 	model = Sequential()
 
 	model.add(Dense(2048, input_shape=input_shape)) 
-	model.add(Dense(2048, activation='relu')) 
+	model.add(Dense(128, activation='relu'))
+	model.add(Dense(128, activation='relu')) 
 	model.add(Dense(MAX_ACTION_SPACE_SIZE, activation='linear'))
 	model.compile(loss='mse', optimizer=Adam(lr=0.001), 
 		metrics=['accuracy'])
