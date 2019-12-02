@@ -2,3 +2,4 @@
 .\models\Epoch1_EpsilonDecay98_Epsilon27_.model filter=lfs diff=lfs merge=lfs -text
 .\models\Epoch0_EpsilonDecay98_Epsilon01_HighActivationUnitCount.model filter=lfs diff=lfs merge=lfs -text
 .\models\Epoch1_EpsilonDecay98_Epsilon01_HighActivationUnitCount.model filter=lfs diff=lfs merge=lfs -text
+.\models\*.model filter=lfs diff=lfs merge=lfs -text
