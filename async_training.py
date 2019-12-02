@@ -81,10 +81,10 @@ if __name__ == '__main__':
 	start_model = args.get('--load_model')
 
 	timeout = 180
-	epsilon_decay = 0.98
+	epsilon_decay = 0.95
 	min_epsilon = 0.01
 	epochs = 2
-	games_to_play = 4
+	games_to_play = 5
 	MINIBATCH_SIZE = 64
 	MIN_REPLAY_MEMORY_SIZE = 1000 
 	games_info = [GameInfo() for _ in range(games_to_play)]
@@ -96,7 +96,9 @@ if __name__ == '__main__':
 		('USCBot9', 'USCBot9'),
 		('USCBot10', 'USCBot10'),
 		('USCBot11', 'USCBot11'),
-		('USCBot12', 'USCBot12')
+		('USCBot12', 'USCBot12'),
+		('USCBot13', 'USCBot13'),
+		('USCBot14', 'USCBot14')
 	]
 
 	with open(os.path.join(ASYNC_TRAIN_DIR, 'teams/PokemonTeam'), 'rt') as teamfd:
@@ -337,7 +339,7 @@ if __name__ == '__main__':
 					)
 					debug_log(f'Rolling average (w={rolling_average_window}) loss: {rolling_window_average_loss}')
 					if ((rolling_window_average_loss < 0.001) or 
-						(min_epsilon_iterations >= 25)
+						(min_epsilon_iterations >= 50)
 					):
 						debug_log('Moving on to next adversarial network iteration')
 						break
