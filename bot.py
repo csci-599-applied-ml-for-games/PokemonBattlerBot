@@ -40,8 +40,20 @@ from gamestate import GameState, health_sum, ko_count, clean_move_name
 from dqn import DQNAgent, ActionType
 
 LOGS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
+REPLAY_MEMORY_DIR = os.path.join(LOGS_DIR, 'replay_memory')
 BOT_DIR = os.path.dirname(__file__)
 TYPE_MAP = {}
+with open(os.path.join(BOT_DIR, 'data/PokemonTypes.csv'), 'r') as typefile:
+	reader = csv.reader(typefile, delimiter=',')		
+	for row in reader:
+		name = row[1]
+		type1 = row[2]
+		type2 = row[3]
+		TYPE_MAP[name] = []
+		if type1 != '':
+			TYPE_MAP[name].append(type1)
+		if type2 != '':
+			TYPE_MAP[name].append(type2)
 
 INPUT_SHAPE = (GameState.vector_dimension(),)
 		
@@ -126,8 +138,12 @@ class BotClient(showdown.Client):
 	def __init__(self, name='', password='', loop=None, max_room_logs=5000,
 		server_id='showdown', server_host=None, expected_opponent=None,
 		team=None, challenge=False, runType=RunType.Iterations, runTypeData=1,
-		agent=None, print_stats=False, trainer=False):
-
+		agent=None, print_stats=False, trainer=False, save_model=True,
+		should_write_replay=False
+	):
+		self.should_write_replay = should_write_replay
+		self.done = False
+		
 		if expected_opponent == None:
 			raise Exception("No expected opponent found in arguments")
 		else:
@@ -155,6 +171,10 @@ class BotClient(showdown.Client):
 		self.logs_dir = LOGS_DIR
 		if not os.path.exists(self.logs_dir):
 			os.mkdir(self.logs_dir)
+		
+		self.replay_memory_dir = REPLAY_MEMORY_DIR
+		if not os.path.exists(self.replay_memory_dir):
+			os.mkdir(self.replay_memory_dir)
 		self.datestring = datetime.now().strftime('%y-%m-%d-%H-%M-%S')
 		self.update_log_paths()
 
@@ -186,11 +206,16 @@ class BotClient(showdown.Client):
 		self.log_file = os.path.join(self.logs_dir, 
 			f'{self.datestring}_Iteration{self.iterations_run}.txt')
 		self.agent.log_path = self.log_file
-		self.agent.replay_memory_path = os.path.join(self.logs_dir, 
-			f'{self.datestring}_Iteration{self.iterations_run}_'
-			'replaymemory.txt')
+		self.agent.replay_memory_path = os.path.join(
+			self.logs_dir, 
+			'replay_memory', 
+			f'{self.datestring}_Iteration{self.iterations_run}_replaymemory.txt'
+		)
 		self.agent.model_path = os.path.join(self.logs_dir, 
 			f'{self.datestring}_Iteration{self.iterations_run}.model')
+
+	def write_replay_memory(self):
+		self.agent.write_replay_memory()
 
 	def log(self, *args):
 		now = datetime.now()
@@ -338,6 +363,9 @@ class BotClient(showdown.Client):
 		self.log('ERROR')
 		self.log(''.join(traceback.format_tb(err.__traceback__)))
 
+	def update_replay_memory(self, transition):
+		self.agent.update_replay_memory(transition)
+		
 	async def on_receive(self, room_id, inp_type, params):
 		try:
 			self.log(f'Input type: {inp_type}')
@@ -451,7 +479,7 @@ class BotClient(showdown.Client):
 							reward, 
 							self.state_vl, 
 							done)
-						self.agent.update_replay_memory(transition)
+						self.update_replay_memory(transition)
 						self.agent.train(False)
 					self.log(f'This transition\'s reward was {reward}')
 					
@@ -650,11 +678,9 @@ class BotClient(showdown.Client):
 						reward, 
 						self.state_vl, 
 						done)
-					self.log(f'Updating replay memory with {transition}')
-					self.agent.update_replay_memory(transition)
-					self.log(f'Successfully updated replay memory')
+					self.update_replay_memory(transition)
 					trained = self.agent.train(True)
-					if trained:
+					if trained and self.save_model:
 						self.log(f'Trained')
 						path = self.agent.save_model()
 						old_epoch = self.agent.current_epoch
@@ -683,6 +709,9 @@ class BotClient(showdown.Client):
 							win_ratio = (float(self.wins) / 
 								float(self.wins + self.losses))
 							print(f'Win ratio: {win_ratio}')
+						self.done = True
+						if self.should_write_replay:
+							self.write_replay_memory()
 						sys.exit(0)
 
 				elif inp_type == '-ability':
@@ -868,6 +897,10 @@ class BotClient(showdown.Client):
 						self.has_challenged = True
 						time.sleep(1)
 						await self.challenge_expected()
+				elif inp_type == 'popup':
+					if 'Due to high load, you are limited to 12 battles and team validations every 3 minutes.' in params[0]:
+						self.log('killing')
+						self.kill()
 		except Exception as err:
 			self.log_error(err)
 
@@ -899,6 +932,10 @@ class BotClient(showdown.Client):
 			self.active_pokemon = None
 			self.opp_active_pokemon = None
 			self.weather = 'none'
+
+	def kill(self):
+		sys.exit(0)
+
 
 def main():
 	args = docopt(__doc__) 
@@ -942,18 +979,6 @@ def main():
 
 	with open(os.path.join(BOT_DIR, 'teams/PokemonTeam'), 'rt') as teamfd:
 		team = teamfd.read()
-	
-	with open(os.path.join(BOT_DIR, 'data/PokemonTypes.csv'), 'r') as typefile:
-		reader = csv.reader(typefile, delimiter=',')		
-		for row in reader:
-			name = row[1]
-			type1 = row[2]
-			type2 = row[3]
-			TYPE_MAP[name] = []
-			if type1 != '':
-				TYPE_MAP[name].append(type1)
-			if type2 != '':
-				TYPE_MAP[name].append(type2)
 
 	if model_type == 'dqn':
 		if not trainer:
